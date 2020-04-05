@@ -1,6 +1,8 @@
 use askama::Template;
 use main_error::MainError;
+use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPool;
+use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::{self, Debug, Display};
 use warp::reject::Reject;
@@ -95,6 +97,50 @@ async fn global_stats(database: &PgPool) -> Result<GlobalStats, DropsError> {
     Ok(result)
 }
 
+#[derive(Debug, Serialize)]
+struct SearchResult {
+    steam_id: String,
+    name: String,
+    count: i32,
+    sim: f64,
+}
+
+impl SearchResult {
+    pub fn weight(&self) -> f64 {
+        self.sim * 5.0 + self.count as f64 * 1.0
+    }
+}
+
+async fn player_search(search: &str, database: &PgPool) -> Result<Vec<SearchResult>, DropsError> {
+    let mut players: Vec<SearchResult> = sqlx::query_as!(
+        SearchResult,
+        r#"SELECT steam_id, name, count, (1 - (name  <-> $1)) AS sim 
+        FROM player_names
+        WHERE name % $1 OR name ~* $1
+        ORDER BY count DESC
+        LIMIT 100"#,
+        search
+    )
+    .fetch_all(database)
+    .await?;
+
+    players.sort_by(|a, b| b.weight().partial_cmp(&a.weight()).unwrap());
+
+    let mut found = HashSet::new();
+
+    Ok(players
+        .into_iter()
+        .filter(|player| {
+            if !found.contains(&player.steam_id) {
+                found.insert(player.steam_id.clone());
+                true
+            } else {
+                false
+            }
+        })
+        .collect())
+}
+
 #[derive(Template)]
 #[template(path = "index.html")]
 struct IndexTemplate {
@@ -106,6 +152,11 @@ struct IndexTemplate {
 #[template(path = "player.html")]
 struct PlayerTemplate {
     stats: DropStats,
+}
+
+#[derive(Deserialize)]
+struct SearchParams {
+    search: String,
 }
 
 #[tokio::main]
@@ -143,7 +194,19 @@ async fn main() -> Result<(), MainError> {
             Ok(warp::reply::html(template.render().unwrap()))
         });
 
-    warp::serve(index.or(player))
+    let search = warp::path!("search")
+        .and(warp::get())
+        .and(warp::query())
+        .and(database.clone())
+        .and_then(move |query: SearchParams, pool| async move {
+            let result = match player_search(&query.search, &pool).await {
+                Ok(stats) => stats,
+                Err(e) => return Err(warp::reject::custom(e)),
+            };
+            Ok(warp::reply::json(&result))
+        });
+
+    warp::serve(index.or(player).or(search))
         .run(([0, 0, 0, 0], 12345))
         .await;
 
