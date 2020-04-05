@@ -1,0 +1,101 @@
+<html>
+<head>
+    <title>drops.tf - sponsored by demos.tf</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 100%;
+        }
+
+        body {
+            background-color: #222;
+            color: #ccc;
+            text-align: center;
+            height: 100%;
+        }
+
+        p.global {
+            margin-top: 100px;
+            font-size: 3em;
+        }
+
+        p.top {
+            margin-top: 50px;
+            font-size: 2em;
+        }
+
+        table.leaderboards {
+            text-align: left;
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        th {
+            text-align: left;
+        }
+
+        td, th {
+            margin: 5px;
+            font-size: 1.2em;
+        }
+
+        p.footer {
+            font-size: 1.5em;
+            bottom: 10px;
+            left: 50%;
+        }
+
+        a {
+            color: #3498db
+        }
+
+        a:visited {
+            color: #3498db;
+        }
+    </style>
+</head>
+<body>
+<p class="global">
+    {{ stats.drops }} ubers dropped in {{ stats.games }} games.
+</p>
+<p class="top">
+    Top Drops
+</p>
+<table class="leaderboards">
+    <thead>
+    <tr>
+        <th>Name</th>
+        <th>Drops</th>
+        <th>Ubers</th>
+        <th>Games</th>
+    </tr>
+    </thead>
+    {% for medic in top %}
+    <tbody>
+    <tr>
+        <td>
+            <a href="/profile/{{medic.steam_id }}">{{ medic.name }}</a>
+        </td>
+        <td>
+            {{ medic.drops }}
+        </td>
+        <td>
+            {{ medic.ubers }}
+        </td>
+        <td>
+            {{ medic.games }}
+        </td>
+    </tr>
+    </tbody>
+    {% endfor %}
+</table>
+<p class="footer">
+    drops.tf is proudly sponsored by <a href="https://demos.tf">demos.tf</a>
+</p>
+</body>
+</html>
