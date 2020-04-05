@@ -5,6 +5,7 @@ use sqlx::postgres::PgPool;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::{self, Debug, Display};
+use std::str::FromStr;
 use warp::reject::Reject;
 use warp::Filter;
 
@@ -162,6 +163,8 @@ struct SearchParams {
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
     let database_url = dotenv::var("DATABASE_URL")?;
+    let port = u16::from_str(&dotenv::var("PORT")?)?;
+
     let pool = PgPool::builder().max_size(2).build(&database_url).await?;
 
     let database = warp::any().map(move || pool.clone());
@@ -207,7 +210,7 @@ async fn main() -> Result<(), MainError> {
         });
 
     warp::serve(index.or(player).or(search))
-        .run(([0, 0, 0, 0], 12345))
+        .run(([0, 0, 0, 0], port))
         .await;
 
     Ok(())
