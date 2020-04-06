@@ -39,6 +39,9 @@ struct DropStats {
     ubers: i32,
     games: i32,
     medic_time: i32,
+    drops_rank: i64,
+    dpu_rank: i64,
+    dps_rank: i64,
 }
 
 impl DropStats {
@@ -48,12 +51,19 @@ impl DropStats {
             self.drops as f64 / (self.medic_time as f64 / 3600.0)
         )
     }
+
+    pub fn dpu(&self) -> String {
+        format!("{:.2}", self.drops as f64 / self.ubers as f64)
+    }
 }
 
 async fn stats_for_user(steam_id: &str, database: &PgPool) -> Result<DropStats, DropsError> {
     let result = sqlx::query_as!(
         DropStats,
-        r#"SELECT user_names.steam_id, name, games, ubers, drops, medic_time
+        r#"SELECT user_names.steam_id, name, games, ubers, drops, medic_time,
+        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.drops > medic_stats.drops) + 1 AS drops_rank,
+        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.dpu > medic_stats.dpu) + 1 AS dpu_rank,
+        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.dps > medic_stats.dps) + 1 AS dps_rank
         FROM medic_stats
         INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
         WHERE medic_stats.steam_id=$1"#,
@@ -65,9 +75,19 @@ async fn stats_for_user(steam_id: &str, database: &PgPool) -> Result<DropStats, 
     Ok(result)
 }
 
-async fn top_stats(database: &PgPool) -> Result<Vec<DropStats>, DropsError> {
+#[derive(Debug)]
+struct TopStats {
+    steam_id: String,
+    name: String,
+    drops: i32,
+    ubers: i32,
+    games: i32,
+    medic_time: i32,
+}
+
+async fn top_stats(database: &PgPool) -> Result<Vec<TopStats>, DropsError> {
     let result = sqlx::query_as!(
-        DropStats,
+        TopStats,
         r#"SELECT user_names.steam_id, games, ubers, drops, medic_time, name
         FROM medic_stats
         INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
@@ -145,7 +165,7 @@ async fn player_search(search: &str, database: &PgPool) -> Result<Vec<SearchResu
 #[derive(Template)]
 #[template(path = "index.html")]
 struct IndexTemplate {
-    top: Vec<DropStats>,
+    top: Vec<TopStats>,
     stats: GlobalStats,
 }
 

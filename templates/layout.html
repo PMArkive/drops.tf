@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>drops.tf</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+        }
+
+        body {
+            font-size: 16px;
+            font-size: 3vw;
+            background-color: #222;
+            color: #ccc;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+        }
+
+        @media screen and (min-width: 500px) {
+            body {
+                font-size: 16px;
+            }
+        }
+
+        div.content {
+            flex: 1 0 auto;
+        }
+
+        p.footer {
+            flex-shrink: 0;
+            font-size: 1.5em;
+            margin-top: 5em;
+            padding-bottom: 10px;
+        }
+
+        a {
+            color: #3498db
+        }
+
+        a:visited {
+            color: #3498db;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+<div class="content">
+    {% block content %}{% endblock %}
+</div>
+<p class="footer">
+    drops.tf is proudly sponsored by <a href="https://demos.tf">demos.tf</a>
+</p>
+{% block end %}{% endblock %}
+</body>
+</html>

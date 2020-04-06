@@ -1,81 +1,38 @@
-<html>
-<head>
-    <title>drops.tf - sponsored by demos.tf</title>
-    <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            position: absolute;
-            top: 0;
-            height: 100%;
-            width: 100%;
-        }
+{% extends "layout.html" %}
 
-        body {
-            background-color: #222;
-            color: #ccc;
-            text-align: center;
-            height: 100%;
-        }
+{% block head %}
+<style>
+    p.name {
+        margin-top: 100px;
+        font-size: 4em;
+    }
 
-        p.name {
-            margin-top: 100px;
-            font-size: 4em;
-        }
+    p.drops {
+        margin-top: 100px;
+        font-size: 3em;
+    }
 
-        p.global, p.drops {
-            margin-top: 100px;
-            font-size: 3em;
-        }
+    p.sub-drops {
+        font-size: 2.5em;
+    }
 
-        p.top {
-            margin-top: 50px;
-            font-size: 2em;
-        }
+    span.rank {
+        opacity: 0.7;
+    }
+</style>
+{% endblock %}
 
-        table.leaderboards {
-            text-align: left;
-            width: 100%;
-            max-width: 900px;
-            margin: 0 auto;
-        }
-
-        th {
-            text-align: left;
-        }
-
-        td, th {
-            margin: 5px;
-            font-size: 1.2em;
-        }
-
-        p.footer {
-            font-size: 1.5em;
-            bottom: 10px;
-            left: 50%;
-        }
-
-        a {
-            color: #3498db
-        }
-
-        a:visited {
-            color: #3498db;
-        }
-    </style>
-</head>
-<body>
+{% block content %}
 <p class="name">
     {{ stats.name }}
 </p>
 <p class="drops">
-    {{ stats.drops }} ubers dropped in {{ stats.games }} games.
+    {{ stats.drops }} ubers dropped in {{ stats.games }} games <span class="rank">#{{ stats.drops_rank }}</span>.
 </p>
-<p class="drops">
-    {{ stats.dpm() }} drops per hour.
+<p class="sub-drops">
+    {{ stats.dpm() }} drops per hour <span class="rank">#{{ stats.dps_rank }}</span>.
 </p>
-<p class="footer">
-    drops.tf is proudly sponsored by <a href="https://demos.tf">demos.tf</a>
+<p class="sub-drops">
+    {{ stats.dpu() }} drops per uber <span class="rank">#{{ stats.dpu_rank }}</span>.
 </p>
-</body>
-</html>
+{% endblock %}
