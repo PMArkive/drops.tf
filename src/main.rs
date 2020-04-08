@@ -35,13 +35,14 @@ impl Debug for DropsError {
 struct DropStats {
     steam_id: String,
     name: String,
-    drops: i32,
-    ubers: i32,
-    games: i32,
-    medic_time: i32,
+    drops: i64,
+    ubers: i64,
+    games: i64,
+    medic_time: i64,
     drops_rank: i64,
     dpu_rank: i64,
     dps_rank: i64,
+    dpg_rank: i64,
 }
 
 impl DropStats {
@@ -55,15 +56,20 @@ impl DropStats {
     pub fn dpu(&self) -> String {
         format!("{:.2}", self.drops as f64 / self.ubers as f64)
     }
+
+    pub fn dpg(&self) -> String {
+        format!("{:.2}", self.drops as f64 / self.games as f64)
+    }
 }
 
 async fn stats_for_user(steam_id: &str, database: &PgPool) -> Result<DropStats, DropsError> {
     let result = sqlx::query_as!(
         DropStats,
         r#"SELECT user_names.steam_id, name, games, ubers, drops, medic_time,
-        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.drops > medic_stats.drops) + 1 AS drops_rank,
-        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.dpu > medic_stats.dpu) + 1 AS dpu_rank,
-        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.dps > medic_stats.dps) + 1 AS dps_rank
+        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.drops > medic_stats.drops AND drops > 100) + 1 AS drops_rank,
+        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.dpu > medic_stats.dpu AND drops > 100) + 1 AS dpu_rank,
+        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.dps > medic_stats.dps AND drops > 100) + 1 AS dps_rank,
+        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.dpg > medic_stats.dpg AND drops > 100) + 1 AS dpg_rank
         FROM medic_stats
         INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
         WHERE medic_stats.steam_id=$1"#,
@@ -79,10 +85,10 @@ async fn stats_for_user(steam_id: &str, database: &PgPool) -> Result<DropStats, 
 struct TopStats {
     steam_id: String,
     name: String,
-    drops: i32,
-    ubers: i32,
-    games: i32,
-    medic_time: i32,
+    drops: i64,
+    ubers: i64,
+    games: i64,
+    medic_time: i64,
 }
 
 async fn top_stats(database: &PgPool) -> Result<Vec<TopStats>, DropsError> {
@@ -122,7 +128,7 @@ async fn global_stats(database: &PgPool) -> Result<GlobalStats, DropsError> {
 struct SearchResult {
     steam_id: String,
     name: String,
-    count: i32,
+    count: i64,
     sim: f64,
 }
 
