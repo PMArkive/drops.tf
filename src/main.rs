@@ -9,6 +9,54 @@ use std::str::FromStr;
 use warp::reject::Reject;
 use warp::{Filter, Rejection, Reply};
 
+fn normalize_steam_id(id: String) -> Result<String, DropsError> {
+    if id.starts_with("STEAM") {
+        let first = u64::from_str(&id[8..9])?;
+        let second = u64::from_str(&id[10..])?;
+
+        Ok(format!("[U:1:{}]", first + (second * 2)))
+    } else if id.starts_with("[U:") {
+        Ok(id)
+    } else if id.starts_with("765") {
+        let base = 76561197960265728u64;
+        let id = u64::from_str(&id)?;
+        Ok(format!("[U:1:{}]", id - base))
+    } else {
+        Err(InvalidStreamIdFormat.into())
+    }
+}
+
+#[derive(Debug)]
+struct InvalidStreamIdFormat;
+
+impl Error for InvalidStreamIdFormat {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
+}
+
+impl Display for InvalidStreamIdFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid steamid fomat")
+    }
+}
+
+#[test]
+fn test_steam_id() {
+    assert_eq!(
+        "[U:1:64229260]".to_string(),
+        normalize_steam_id("76561198024494988".to_string()).unwrap()
+    );
+    assert_eq!(
+        "[U:1:64229260]".to_string(),
+        normalize_steam_id("STEAM_1:0:32114630".to_string()).unwrap()
+    );
+    assert_eq!(
+        "[U:1:64229260]".to_string(),
+        normalize_steam_id("[U:1:64229260]".to_string()).unwrap()
+    );
+}
+
 struct DropsError(Box<dyn Error + Send + Sync + 'static>);
 
 impl<E: Into<Box<dyn Error + Send + Sync + 'static>>> From<E> for DropsError {
@@ -28,6 +76,12 @@ impl Debug for DropsError {
             source = error.source();
         }
         Ok(())
+    }
+}
+
+impl From<DropsError> for Rejection {
+    fn from(from: DropsError) -> Self {
+        warp::reject::custom(from)
     }
 }
 
@@ -267,16 +321,21 @@ impl Display for TopOrder {
 }
 
 async fn page_top_stats(pool: PgPool, order: TopOrder) -> Result<impl Reply, Rejection> {
-    let top = match top_stats(&pool, order).await {
-        Ok(stats) => stats,
-        Err(e) => return Err(warp::reject::custom(e)),
-    };
-    let stats = match global_stats(&pool).await {
-        Ok(stats) => stats,
-        Err(e) => return Err(warp::reject::custom(e)),
-    };
+    let top = top_stats(&pool, order).await?;
+    let stats = global_stats(&pool).await?;
     let template = IndexTemplate { top, stats };
     Ok(warp::reply::html(template.render().unwrap()))
+}
+
+async fn page_player(steam_id: String, pool: PgPool) -> Result<impl Reply, Rejection> {
+    let stats = stats_for_user(&normalize_steam_id(steam_id)?, &pool).await?;
+    let template = PlayerTemplate { stats };
+    Ok(warp::reply::html(template.render().unwrap()))
+}
+
+async fn api_search(query: SearchParams, pool: PgPool) -> Result<impl Reply, Rejection> {
+    let result = player_search(&query.search, &pool).await?;
+    Ok(warp::reply::json(&result))
 }
 
 #[tokio::main]
@@ -311,26 +370,13 @@ async fn main() -> Result<(), MainError> {
     let player = warp::path!("profile" / String)
         .and(warp::get())
         .and(database.clone())
-        .and_then(move |steam_id: String, pool| async move {
-            let stats = match stats_for_user(&steam_id, &pool).await {
-                Ok(stats) => stats,
-                Err(e) => return Err(warp::reject::custom(e)),
-            };
-            let template = PlayerTemplate { stats };
-            Ok(warp::reply::html(template.render().unwrap()))
-        });
+        .and_then(page_player);
 
     let search = warp::path!("search")
         .and(warp::get())
         .and(warp::query())
         .and(database.clone())
-        .and_then(move |query: SearchParams, pool| async move {
-            let result = match player_search(&query.search, &pool).await {
-                Ok(stats) => stats,
-                Err(e) => return Err(warp::reject::custom(e)),
-            };
-            Ok(warp::reply::json(&result))
-        });
+        .and_then(api_search);
 
     warp::serve(index.or(dpg).or(dpu).or(dps).or(player).or(search))
         .run(([0, 0, 0, 0], port))
