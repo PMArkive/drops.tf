@@ -49,15 +49,15 @@ impl Display for InvalidStreamIdFormat {
 fn test_steam_id() {
     assert_eq!(
         "[U:1:64229260]".to_string(),
-        normalize_steam_id("76561198024494988".to_string()).unwrap()
+        normalize_steam_id("76561198024494988").unwrap()
     );
     assert_eq!(
         "[U:1:64229260]".to_string(),
-        normalize_steam_id("STEAM_1:0:32114630".to_string()).unwrap()
+        normalize_steam_id("STEAM_1:0:32114630").unwrap()
     );
     assert_eq!(
         "[U:1:64229260]".to_string(),
-        normalize_steam_id("[U:1:64229260]".to_string()).unwrap()
+        normalize_steam_id("[U:1:64229260]").unwrap()
     );
 }
 
