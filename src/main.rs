@@ -9,18 +9,22 @@ use std::str::FromStr;
 use warp::reject::Reject;
 use warp::{Filter, Rejection, Reply};
 
-fn normalize_steam_id(id: String) -> Result<String, DropsError> {
+fn normalize_steam_id(id: &str) -> Result<String, DropsError> {
     if id.starts_with("STEAM") {
         let first = u64::from_str(&id[8..9])?;
         let second = u64::from_str(&id[10..])?;
 
         Ok(format!("[U:1:{}]", first + (second * 2)))
     } else if id.starts_with("[U:") {
-        Ok(id)
+        Ok(id.to_string())
     } else if id.starts_with("765") {
         let base = 76561197960265728u64;
         let id = u64::from_str(&id)?;
-        Ok(format!("[U:1:{}]", id - base))
+        if id > base {
+            Ok(format!("[U:1:{}]", id - base))
+        } else {
+            Err(InvalidStreamIdFormat.into())
+        }
     } else {
         Err(InvalidStreamIdFormat.into())
     }
@@ -217,6 +221,19 @@ async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, 
     Ok(result)
 }
 
+async fn get_user_name(steam_id: &str, database: &PgPool) -> Result<Option<String>, DropsError> {
+    let result = sqlx::query!(
+        r#"SELECT name
+        FROM user_names
+        WHERE steam_id=$1"#,
+        steam_id
+    )
+    .fetch_one(database)
+    .await?;
+
+    Ok(result.name)
+}
+
 #[derive(Debug)]
 struct GlobalStats {
     drops: i64,
@@ -328,12 +345,22 @@ async fn page_top_stats(pool: PgPool, order: TopOrder) -> Result<impl Reply, Rej
 }
 
 async fn page_player(steam_id: String, pool: PgPool) -> Result<impl Reply, Rejection> {
-    let stats = stats_for_user(&normalize_steam_id(steam_id)?, &pool).await?;
+    let stats = stats_for_user(&normalize_steam_id(&steam_id)?, &pool).await?;
     let template = PlayerTemplate { stats };
     Ok(warp::reply::html(template.render().unwrap()))
 }
 
 async fn api_search(query: SearchParams, pool: PgPool) -> Result<impl Reply, Rejection> {
+    if let Ok(steam_id) = normalize_steam_id(&query.search) {
+        if let Some(name) = get_user_name(&steam_id, &pool).await? {
+            return Ok(warp::reply::json(&vec![SearchResult {
+                steam_id,
+                name,
+                count: 1,
+                sim: 1.0,
+            }]));
+        }
+    }
     let result = player_search(&query.search, &pool).await?;
     Ok(warp::reply::json(&result))
 }
