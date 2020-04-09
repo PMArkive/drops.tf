@@ -201,7 +201,7 @@ async fn player_search(search: &str, database: &PgPool) -> Result<Vec<SearchResu
         SearchResult,
         r#"SELECT steam_id, name, count, (1 - (name  <-> $1)) AS sim 
         FROM player_names
-        WHERE name % $1 OR name ~* $1
+        WHERE name ~* $1
         ORDER BY count DESC
         LIMIT 100"#,
         search

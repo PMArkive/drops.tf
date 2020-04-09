@@ -121,10 +121,24 @@
 
     const search = document.getElementById('search');
 
+    function debounce(func, wait, immediate) {
+        var timeout;
+        return function() {
+            var context = this, args = arguments;
+            var later = function() {
+                timeout = null;
+                if (!immediate) func.apply(context, args);
+            };
+            var callNow = immediate && !timeout;
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+            if (callNow) func.apply(context, args);
+        };
+    }
+
     autocomplete({
         input: search,
-        fetch: async function (text, update) {
-            console.log(text);
+        fetch: debounce(async function (text, update) {
             const result = await fetch('/search?search=' + encodeURIComponent(search.value));
             const data = await result.json();
             let users = [];
@@ -132,7 +146,7 @@
                 users.push({value: user.steam_id, label: user.name});
             }
             update(users);
-        },
+        }, 250),
         onSelect: function (item) {
             window.location.href = '/profile/' + item.value;
         }
