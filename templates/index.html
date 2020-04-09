@@ -17,6 +17,11 @@
         width: 100%;
         max-width: 900px;
         margin: 0 auto;
+        table-layout: fixed;
+    }
+
+    td.stat, th.stat {
+        width: 120px;
     }
 
     th {
@@ -80,9 +85,10 @@
     <thead>
     <tr>
         <th>Name</th>
-        <th>Drops</th>
-        <th>Ubers</th>
-        <th>Games</th>
+        <th class="stat"><a href="/">Drops</a></th>
+        <th class="stat"><a href="/dpu">per uber</a></th>
+        <th class="stat"><a href="/dpg">per game</a></th>
+        <th class="stat"><a href="/dph">per hour</a></th>
     </tr>
     </thead>
     {% for medic in top %}
@@ -91,14 +97,17 @@
         <td>
             <a href="/profile/{{medic.steam_id }}">{{ medic.name }}</a>
         </td>
-        <td>
+        <td class="stat">
             {{ medic.drops }}
         </td>
-        <td>
-            {{ medic.ubers }}
+        <td class="stat">
+            {{ medic.dpu() }}
         </td>
-        <td>
-            {{ medic.games }}
+        <td class="stat">
+            {{ medic.dpg() }}
+        </td>
+        <td class="stat">
+            {{ medic.dpm() }}
         </td>
     </tr>
     </tbody>

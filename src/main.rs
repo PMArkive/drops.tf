@@ -7,7 +7,7 @@ use std::error::Error;
 use std::fmt::{self, Debug, Display};
 use std::str::FromStr;
 use warp::reject::Reject;
-use warp::Filter;
+use warp::{Filter, Rejection, Reply};
 
 struct DropsError(Box<dyn Error + Send + Sync + 'static>);
 
@@ -66,17 +66,17 @@ async fn stats_for_user(steam_id: &str, database: &PgPool) -> Result<DropStats, 
     let result = sqlx::query_as!(
         DropStats,
         r#"SELECT user_names.steam_id, name, games, ubers, drops, medic_time,
-        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.drops > medic_stats.drops AND drops > 100) + 1 AS drops_rank,
-        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.dpu > medic_stats.dpu AND drops > 100) + 1 AS dpu_rank,
-        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.dps > medic_stats.dps AND drops > 100) + 1 AS dps_rank,
-        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.dpg > medic_stats.dpg AND drops > 100) + 1 AS dpg_rank
+        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.drops > medic_stats.drops AND m2.drops > 100) + 1 AS drops_rank,
+        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.dpu > medic_stats.dpu AND m2.drops > 100) + 1 AS dpu_rank,
+        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.dps > medic_stats.dps AND m2.drops > 100) + 1 AS dps_rank,
+        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.dpg > medic_stats.dpg AND m2.drops > 100) + 1 AS dpg_rank
         FROM medic_stats
         INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
         WHERE medic_stats.steam_id=$1"#,
         steam_id
     )
-    .fetch_one(database)
-    .await?;
+        .fetch_one(database)
+        .await?;
 
     Ok(result)
 }
@@ -91,16 +91,74 @@ struct TopStats {
     medic_time: i64,
 }
 
-async fn top_stats(database: &PgPool) -> Result<Vec<TopStats>, DropsError> {
-    let result = sqlx::query_as!(
-        TopStats,
-        r#"SELECT user_names.steam_id, games, ubers, drops, medic_time, name
-        FROM medic_stats
-        INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
-        ORDER BY drops DESC LIMIT 25"#
-    )
-    .fetch_all(database)
-    .await?;
+impl TopStats {
+    pub fn dpm(&self) -> String {
+        format!(
+            "{:.2}",
+            self.drops as f64 / (self.medic_time as f64 / 3600.0)
+        )
+    }
+
+    pub fn dpu(&self) -> String {
+        format!("{:.2}", self.drops as f64 / self.ubers as f64)
+    }
+
+    pub fn dpg(&self) -> String {
+        format!("{:.2}", self.drops as f64 / self.games as f64)
+    }
+}
+
+async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, DropsError> {
+    let result = match order {
+        TopOrder::Drops => {
+            sqlx::query_as!(
+                TopStats,
+                r#"SELECT user_names.steam_id, games, ubers, drops, medic_time, name
+                FROM medic_stats
+                INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
+                WHERE drops > 100 AND medic_stats.steam_id != 'BOT'
+                ORDER BY drops DESC LIMIT 25"#
+            )
+            .fetch_all(database)
+            .await?
+        }
+        TopOrder::Dps => {
+            sqlx::query_as!(
+                TopStats,
+                r#"SELECT user_names.steam_id, games, ubers, drops, medic_time, name
+                FROM medic_stats
+                INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
+                WHERE drops > 100 AND medic_stats.steam_id != 'BOT'
+                ORDER BY dps DESC LIMIT 25"#
+            )
+            .fetch_all(database)
+            .await?
+        }
+        TopOrder::Dpu => {
+            sqlx::query_as!(
+                TopStats,
+                r#"SELECT user_names.steam_id, games, ubers, drops, medic_time, name
+                FROM medic_stats
+                INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
+                WHERE drops > 100 AND medic_stats.steam_id != 'BOT'
+                ORDER BY dpu DESC LIMIT 25"#
+            )
+            .fetch_all(database)
+            .await?
+        }
+        TopOrder::Dpg => {
+            sqlx::query_as!(
+                TopStats,
+                r#"SELECT user_names.steam_id, games, ubers, drops, medic_time, name
+                FROM medic_stats
+                INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
+                WHERE drops > 100 AND medic_stats.steam_id != 'BOT'
+                ORDER BY dpg DESC LIMIT 25"#
+            )
+            .fetch_all(database)
+            .await?
+        }
+    };
 
     Ok(result)
 }
@@ -186,6 +244,41 @@ struct SearchParams {
     search: String,
 }
 
+enum TopOrder {
+    Drops,
+    Dps,
+    Dpg,
+    Dpu,
+}
+
+impl Display for TopOrder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                TopOrder::Drops => "drops",
+                TopOrder::Dps => "dps",
+                TopOrder::Dpg => "dpg",
+                TopOrder::Dpu => "dpu",
+            }
+        )
+    }
+}
+
+async fn page_top_stats(pool: PgPool, order: TopOrder) -> Result<impl Reply, Rejection> {
+    let top = match top_stats(&pool, order).await {
+        Ok(stats) => stats,
+        Err(e) => return Err(warp::reject::custom(e)),
+    };
+    let stats = match global_stats(&pool).await {
+        Ok(stats) => stats,
+        Err(e) => return Err(warp::reject::custom(e)),
+    };
+    let template = IndexTemplate { top, stats };
+    Ok(warp::reply::html(template.render().unwrap()))
+}
+
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
     let database_url = dotenv::var("DATABASE_URL")?;
@@ -198,18 +291,22 @@ async fn main() -> Result<(), MainError> {
     let index = warp::path::end()
         .and(warp::get())
         .and(database.clone())
-        .and_then(move |pool| async move {
-            let top = match top_stats(&pool).await {
-                Ok(stats) => stats,
-                Err(e) => return Err(warp::reject::custom(e)),
-            };
-            let stats = match global_stats(&pool).await {
-                Ok(stats) => stats,
-                Err(e) => return Err(warp::reject::custom(e)),
-            };
-            let template = IndexTemplate { top, stats };
-            Ok(warp::reply::html(template.render().unwrap()))
-        });
+        .and_then(move |pool| page_top_stats(pool, TopOrder::Drops));
+
+    let dpg = warp::path::path("dpg")
+        .and(warp::get())
+        .and(database.clone())
+        .and_then(move |pool| page_top_stats(pool, TopOrder::Dpg));
+
+    let dps = warp::path::path("dph")
+        .and(warp::get())
+        .and(database.clone())
+        .and_then(move |pool| page_top_stats(pool, TopOrder::Dps));
+
+    let dpu = warp::path::path("dpu")
+        .and(warp::get())
+        .and(database.clone())
+        .and_then(move |pool| page_top_stats(pool, TopOrder::Dpu));
 
     let player = warp::path!("profile" / String)
         .and(warp::get())
@@ -235,7 +332,7 @@ async fn main() -> Result<(), MainError> {
             Ok(warp::reply::json(&result))
         });
 
-    warp::serve(index.or(player).or(search))
+    warp::serve(index.or(dpg).or(dpu).or(dps).or(player).or(search))
         .run(([0, 0, 0, 0], port))
         .await;
 
