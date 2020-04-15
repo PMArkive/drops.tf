@@ -108,13 +108,27 @@ impl DropStats {
 }
 
 async fn stats_for_user(steam_id: SteamID, database: &PgPool) -> Result<DropStats, DropsError> {
+    // for medics with more than 100 drops we have cached info
+    if let Ok(result) = sqlx::query_as!(
+        DropStats,
+        r#"SELECT steam_id, name, games, ubers, drops, medic_time, drops_rank, dpu_rank, dps_rank, dpg_rank
+        FROM ranked_medic_stats
+        WHERE steam_id=$1"#,
+        steam_id.steam3()
+    )
+        .fetch_one(database)
+        .await {
+        return Ok(result);
+    }
+
+    // for other we need to recalculate
     let result = sqlx::query_as!(
         DropStats,
         r#"SELECT user_names.steam_id, name, games, ubers, drops, medic_time,
-        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.drops > medic_stats.drops AND m2.drops > 100) + 1 AS drops_rank,
-        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.dpu > medic_stats.dpu AND m2.drops > 100) + 1 AS dpu_rank,
-        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.dps > medic_stats.dps AND m2.drops > 100) + 1 AS dps_rank,
-        (SELECT COUNT(*) FROM medic_stats m2 WHERE m2.dpg > medic_stats.dpg AND m2.drops > 100) + 1 AS dpg_rank
+        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.drops > medic_stats.drops AND m2.drops > 100) + 1 AS drops_rank,
+        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpu > medic_stats.dpu AND m2.drops > 100) + 1 AS dpu_rank,
+        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dps > medic_stats.dps AND m2.drops > 100) + 1 AS dps_rank,
+        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpg > medic_stats.dpg AND m2.drops > 100) + 1 AS dpg_rank
         FROM medic_stats
         INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
         WHERE medic_stats.steam_id=$1"#,
@@ -158,10 +172,8 @@ async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, 
         TopOrder::Drops => {
             sqlx::query_as!(
                 TopStats,
-                r#"SELECT user_names.steam_id, games, ubers, drops, medic_time, name
-                FROM medic_stats
-                INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
-                WHERE drops > 100 AND medic_stats.steam_id != 'BOT'
+                r#"SELECT steam_id, games, ubers, drops, medic_time, name
+                FROM ranked_medic_stats
                 ORDER BY drops DESC LIMIT 25"#
             )
             .fetch_all(database)
@@ -170,10 +182,8 @@ async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, 
         TopOrder::Dps => {
             sqlx::query_as!(
                 TopStats,
-                r#"SELECT user_names.steam_id, games, ubers, drops, medic_time, name
-                FROM medic_stats
-                INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
-                WHERE drops > 100 AND medic_stats.steam_id != 'BOT'
+                r#"SELECT steam_id, games, ubers, drops, medic_time, name
+                FROM ranked_medic_stats
                 ORDER BY dps DESC LIMIT 25"#
             )
             .fetch_all(database)
@@ -182,10 +192,8 @@ async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, 
         TopOrder::Dpu => {
             sqlx::query_as!(
                 TopStats,
-                r#"SELECT user_names.steam_id, games, ubers, drops, medic_time, name
-                FROM medic_stats
-                INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
-                WHERE drops > 100 AND medic_stats.steam_id != 'BOT'
+                r#"SELECT steam_id, games, ubers, drops, medic_time, name
+                FROM ranked_medic_stats
                 ORDER BY dpu DESC LIMIT 25"#
             )
             .fetch_all(database)
@@ -194,10 +202,8 @@ async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, 
         TopOrder::Dpg => {
             sqlx::query_as!(
                 TopStats,
-                r#"SELECT user_names.steam_id, games, ubers, drops, medic_time, name
-                FROM medic_stats
-                INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
-                WHERE drops > 100 AND medic_stats.steam_id != 'BOT'
+                r#"SELECT steam_id, games, ubers, drops, medic_time, name
+                FROM ranked_medic_stats
                 ORDER BY dpg DESC LIMIT 25"#
             )
             .fetch_all(database)
