@@ -2,9 +2,21 @@
 
 {% block head %}
 <style>
-    p.name {
+    div.name {
         margin-top: 100px;
+        position: relative;
+    }
+
+    p.name {
         font-size: 4em;
+    }
+
+    p.name a {
+        color: #ccc;
+    }
+
+    p.name a:focus {
+        outline: none;
     }
 
     p.drops {
@@ -33,6 +45,35 @@
         color: white;
         outline: none;
     }
+
+    ul.dropdown.hidden {
+        display: none;
+    }
+
+    ul.dropdown {
+        display: block;
+        list-style: none;
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translate(-50%, 0);
+        background: #222;
+        text-align: left;
+        border: 1px solid #ccc;
+        border-radius: 2px;
+        padding: 0;
+        margin: 0;
+        min-width: 150px;
+    }
+
+    ul.dropdown li {
+        padding: 5px;
+    }
+
+    ul.dropdown a {
+        color: #ccc;
+        font-size: 1.5em;
+    }
 </style>
 {% endblock %}
 
@@ -44,9 +85,19 @@
         </svg>
     </a>
 </p>
-<p class="name">
-    {{ stats.name }}
-</p>
+<div class="name">
+    <p class="name">
+        <a href="#" id="namelink">{{ stats.name }}</a>
+    </p>
+    <ul class="dropdown hidden" id="dropdown">
+        <li><a href="{{ stats.steam_link() }}">Steam</a></li>
+        <li><a href="{{ stats.etf2l_link() }}">ETF2L</a></li>
+        <li><a href="{{ stats.ugc_link() }}">UGC</a></li>
+        <li><a href="{{ stats.rgl_link() }}">RGL</a></li>
+        <li><a href="{{ stats.logs_link() }}">Logs</a></li>
+        <li><a href="{{ stats.demos_link() }}">Demos</a></li>
+    </ul>
+</div>
 <p class="drops">
     {{ stats.drops }} ubers dropped <span class="rank">#{{ stats.drops_rank }}</span>.
 </p>
@@ -59,4 +110,26 @@
 <p class="sub-drops">
     {{ stats.dpu() }} drops per uber <span class="rank">#{{ stats.dpu_rank }}</span>.
 </p>
+{% endblock %}
+
+{% block end %}
+<script>
+    const dropDown = document.getElementById('dropdown');
+    const nameLink = document.getElementById('namelink');
+
+    nameLink.addEventListener('click', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+
+        dropDown.classList.toggle('hidden');
+    });
+
+    dropDown.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+
+    document.body.addEventListener('click', function(e) {
+        dropDown.classList.add('hidden');
+    });
+</script>
 {% endblock %}

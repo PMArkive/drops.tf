@@ -6,60 +6,9 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::{self, Debug, Display};
 use std::str::FromStr;
+use steamid_ng::SteamID;
 use warp::reject::Reject;
 use warp::{Filter, Rejection, Reply};
-
-fn normalize_steam_id(id: &str) -> Result<String, DropsError> {
-    if id.starts_with("STEAM") {
-        let first = u64::from_str(&id[8..9])?;
-        let second = u64::from_str(&id[10..])?;
-
-        Ok(format!("[U:1:{}]", first + (second * 2)))
-    } else if id.starts_with("[U:") {
-        Ok(id.to_string())
-    } else if id.starts_with("765") {
-        let base = 76561197960265728u64;
-        let id = u64::from_str(&id)?;
-        if id > base {
-            Ok(format!("[U:1:{}]", id - base))
-        } else {
-            Err(InvalidStreamIdFormat.into())
-        }
-    } else {
-        Err(InvalidStreamIdFormat.into())
-    }
-}
-
-#[derive(Debug)]
-struct InvalidStreamIdFormat;
-
-impl Error for InvalidStreamIdFormat {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
-    }
-}
-
-impl Display for InvalidStreamIdFormat {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Invalid steamid fomat")
-    }
-}
-
-#[test]
-fn test_steam_id() {
-    assert_eq!(
-        "[U:1:64229260]".to_string(),
-        normalize_steam_id("76561198024494988").unwrap()
-    );
-    assert_eq!(
-        "[U:1:64229260]".to_string(),
-        normalize_steam_id("STEAM_1:0:32114630").unwrap()
-    );
-    assert_eq!(
-        "[U:1:64229260]".to_string(),
-        normalize_steam_id("[U:1:64229260]").unwrap()
-    );
-}
 
 struct DropsError(Box<dyn Error + Send + Sync + 'static>);
 
@@ -118,9 +67,47 @@ impl DropStats {
     pub fn dpg(&self) -> String {
         format!("{:.2}", self.drops as f64 / self.games as f64)
     }
+
+    pub fn steam_link(&self) -> String {
+        format!("http://steamcommunity.com/profiles/{}", self.steam_id)
+    }
+
+    pub fn etf2l_link(&self) -> String {
+        format!(
+            "http://etf2l.org/search/{}",
+            &self.steam_id[1..self.steam_id.len() - 1]
+        )
+    }
+
+    pub fn ugc_link(&self) -> String {
+        let steam_id_64 = u64::from(SteamID::from_steam3(&self.steam_id).unwrap());
+
+        format!(
+            "https://www.ugcleague.com/players_page.cfm?player_id={}",
+            steam_id_64
+        )
+    }
+
+    pub fn logs_link(&self) -> String {
+        let steam_id_64 = u64::from(SteamID::from_steam3(&self.steam_id).unwrap());
+
+        format!("http://logs.tf/profile/{}", steam_id_64)
+    }
+
+    pub fn demos_link(&self) -> String {
+        let steam_id_64 = u64::from(SteamID::from_steam3(&self.steam_id).unwrap());
+
+        format!("http://demos.tf/profiles/{}", steam_id_64)
+    }
+
+    pub fn rgl_link(&self) -> String {
+        let steam_id_64 = u64::from(SteamID::from_steam3(&self.steam_id).unwrap());
+
+        format!("https://rgl.gg/Public/PlayerProfile.aspx?p={}", steam_id_64)
+    }
 }
 
-async fn stats_for_user(steam_id: &str, database: &PgPool) -> Result<DropStats, DropsError> {
+async fn stats_for_user(steam_id: SteamID, database: &PgPool) -> Result<DropStats, DropsError> {
     let result = sqlx::query_as!(
         DropStats,
         r#"SELECT user_names.steam_id, name, games, ubers, drops, medic_time,
@@ -131,7 +118,7 @@ async fn stats_for_user(steam_id: &str, database: &PgPool) -> Result<DropStats, 
         FROM medic_stats
         INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
         WHERE medic_stats.steam_id=$1"#,
-        steam_id
+        steam_id.steam3()
     )
         .fetch_one(database)
         .await?;
@@ -221,12 +208,12 @@ async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, 
     Ok(result)
 }
 
-async fn get_user_name(steam_id: &str, database: &PgPool) -> Result<Option<String>, DropsError> {
+async fn get_user_name(steam_id: SteamID, database: &PgPool) -> Result<Option<String>, DropsError> {
     let result = sqlx::query!(
         r#"SELECT name
         FROM user_names
         WHERE steam_id=$1"#,
-        steam_id
+        steam_id.steam3()
     )
     .fetch_one(database)
     .await?;
@@ -345,16 +332,16 @@ async fn page_top_stats(pool: PgPool, order: TopOrder) -> Result<impl Reply, Rej
 }
 
 async fn page_player(steam_id: String, pool: PgPool) -> Result<impl Reply, Rejection> {
-    let stats = stats_for_user(&normalize_steam_id(&steam_id)?, &pool).await?;
+    let stats = stats_for_user(steam_id.parse().map_err(DropsError::from)?, &pool).await?;
     let template = PlayerTemplate { stats };
     Ok(warp::reply::html(template.render().unwrap()))
 }
 
 async fn api_search(query: SearchParams, pool: PgPool) -> Result<impl Reply, Rejection> {
-    if let Ok(steam_id) = normalize_steam_id(&query.search) {
-        if let Some(name) = get_user_name(&steam_id, &pool).await? {
+    if let Ok(steam_id) = query.search.parse() {
+        if let Some(name) = get_user_name(steam_id, &pool).await? {
             return Ok(warp::reply::json(&vec![SearchResult {
-                steam_id,
+                steam_id: steam_id.steam3(),
                 name,
                 count: 1,
                 sim: 1.0,
