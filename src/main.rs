@@ -264,7 +264,7 @@ async fn player_search(search: &str, database: &PgPool) -> Result<Vec<SearchResu
     let mut players: Vec<SearchResult> = sqlx::query_as!(
         SearchResult,
         r#"SELECT steam_id, name, count, (1 - (name  <-> $1)) AS sim 
-        FROM common_player_names
+        FROM medic_names
         WHERE name ~* $1
         ORDER BY count DESC
         LIMIT 50"#,
@@ -272,20 +272,6 @@ async fn player_search(search: &str, database: &PgPool) -> Result<Vec<SearchResu
     )
     .fetch_all(database)
     .await?;
-
-    if players.len() < 50 && search.len() > 4 {
-        players = sqlx::query_as!(
-            SearchResult,
-            r#"SELECT steam_id, name, count, (1 - (name  <-> $1)) AS sim 
-            FROM player_names
-            WHERE name ~* $1
-            ORDER BY count DESC
-            LIMIT 25"#,
-            search
-        )
-        .fetch_all(database)
-        .await?;
-    }
 
     players.sort_by(|a, b| b.weight().partial_cmp(&a.weight()).unwrap());
 
