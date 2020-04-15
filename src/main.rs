@@ -69,7 +69,7 @@ impl DropStats {
     }
 
     pub fn steam_link(&self) -> String {
-        format!("http://steamcommunity.com/profiles/{}", self.steam_id)
+        format!("https://steamcommunity.com/profiles/{}", self.steam_id)
     }
 
     pub fn etf2l_link(&self) -> String {
