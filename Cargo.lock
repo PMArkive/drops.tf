@@ -1399,8 +1399,9 @@ dependencies = [
 
 [[package]]
 name = "steamid-ng"
-version = "0.3.3"
-source = "git+https://github.com/icewind1991/steamid-ng?branch=impl-error#1bcac2b421008c414e05da198288da2386b240d3"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b2b757a361f79259575245bcb071dc380b94da67e51afe5f37ec2ac1ed49b69"
 dependencies = [
  "enum_primitive",
  "lazy_static",
