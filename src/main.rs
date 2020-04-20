@@ -304,6 +304,14 @@ struct PlayerTemplate {
     stats: DropStats,
 }
 
+#[derive(Template)]
+#[template(path = "notfound.html")]
+struct NotFoundTemplate;
+
+#[derive(Template)]
+#[template(path = "404.html")]
+struct PageNotFoundTemplate;
+
 #[derive(Deserialize)]
 struct SearchParams {
     search: String,
@@ -399,7 +407,13 @@ async fn page_player(
             .await?
             .ok_or(e)?,
     };
-    let stats = stats_for_user(steam_id, &pool).await?;
+    let stats = match stats_for_user(steam_id, &pool).await {
+        Ok(stats) => stats,
+        Err(_) => {
+            let template = NotFoundTemplate;
+            return Ok(warp::reply::html(template.render().unwrap()));
+        }
+    };
     let template = PlayerTemplate { stats };
     Ok(warp::reply::html(template.render().unwrap()))
 }
@@ -463,9 +477,21 @@ async fn main() -> Result<(), MainError> {
         .and(database.clone())
         .and_then(api_search);
 
-    warp::serve(index.or(dpg).or(dpu).or(dps).or(player).or(search))
-        .run(([0, 0, 0, 0], port))
-        .await;
+    let not_found = warp::any().map(|| {
+        return Ok(warp::reply::html(PageNotFoundTemplate.render().unwrap()));
+    });
+
+    warp::serve(
+        index
+            .or(dpg)
+            .or(dpu)
+            .or(dps)
+            .or(player)
+            .or(search)
+            .or(not_found),
+    )
+    .run(([0, 0, 0, 0], port))
+    .await;
 
     Ok(())
 }

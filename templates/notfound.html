@@ -1,0 +1,43 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<style>
+    div.name {
+        margin-top: 100px;
+        position: relative;
+    }
+
+    p.name {
+        font-size: 4em;
+    }
+
+    p.home {
+        margin: 0;
+        font-size: 3em;
+        position: absolute;
+        top: 10px;
+        left: 10px;
+    }
+
+    p.home a, p.home a:focus {
+        text-decoration: none;
+        color: white;
+        outline: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<p class="home">
+    <a href="/">
+        <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">
+            <path d="M30 16.5h-18.26l8.38-8.38-2.12-2.12-12 12 12 12 2.12-2.12-8.38-8.38h18.26v-3z" fill="#ccc"/>
+        </svg>
+    </a>
+</p>
+<div class="name">
+    <p class="name">
+        User not found or no drops
+    </p>
+</div>
+{% endblock %}
