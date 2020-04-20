@@ -1,5 +1,6 @@
 use askama::Template;
 use main_error::MainError;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPool;
 use std::collections::HashSet;
@@ -337,8 +338,68 @@ async fn page_top_stats(pool: PgPool, order: TopOrder) -> Result<impl Reply, Rej
     Ok(warp::reply::html(template.render().unwrap()))
 }
 
-async fn page_player(steam_id: String, pool: PgPool) -> Result<impl Reply, Rejection> {
-    let stats = stats_for_user(steam_id.parse().map_err(DropsError::from)?, &pool).await?;
+// {"response":{"steamid":"76561198024494988","success":1}}
+#[derive(Deserialize)]
+struct SteamApiResponse {
+    response: VanityUrlResponse,
+}
+
+#[derive(Deserialize)]
+struct VanityUrlResponse {
+    #[serde(default)]
+    steamid: String,
+    success: u8,
+}
+
+async fn resolve_vanity_url(
+    database: &PgPool,
+    url: &str,
+    api_key: &str,
+) -> Result<Option<SteamID>, DropsError> {
+    if let Ok(row) = sqlx::query!(r#"SELECT steam_id FROM vanity_urls WHERE url=$1"#, url)
+        .fetch_one(database)
+        .await
+    {
+        let steam_id: String = row.steam_id;
+        Ok(Some(steam_id.parse()?))
+    } else {
+        let response: SteamApiResponse = Client::new()
+            .get("http://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/")
+            .query(&[("key", api_key), ("vanityurl", url)])
+            .send()
+            .await?
+            .json()
+            .await?;
+
+        if response.response.success == 1 {
+            let steam_id: SteamID = response.response.steamid.parse()?;
+            sqlx::query!(
+                r#"INSERT INTO vanity_urls(url, steam_id) VALUES($1, $2)"#,
+                url,
+                steam_id.steam3()
+            )
+            .execute(database)
+            .await?;
+
+            Ok(Some(steam_id))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+async fn page_player(
+    steam_id: String,
+    pool: PgPool,
+    api_key: String,
+) -> Result<impl Reply, Rejection> {
+    let steam_id = match steam_id.parse().map_err(DropsError::from) {
+        Ok(steam_id) => steam_id,
+        Err(e) => resolve_vanity_url(&pool, &steam_id, &api_key)
+            .await?
+            .ok_or(e)?,
+    };
+    let stats = stats_for_user(steam_id, &pool).await?;
     let template = PlayerTemplate { stats };
     Ok(warp::reply::html(template.render().unwrap()))
 }
@@ -361,11 +422,14 @@ async fn api_search(query: SearchParams, pool: PgPool) -> Result<impl Reply, Rej
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
     let database_url = dotenv::var("DATABASE_URL")?;
+    let api_key = dotenv::var("STEAM_API_KEY")?;
     let port = u16::from_str(&dotenv::var("PORT")?)?;
 
     let pool = PgPool::builder().max_size(2).build(&database_url).await?;
 
     let database = warp::any().map(move || pool.clone());
+
+    let api_key = warp::any().map(move || api_key.clone());
 
     let index = warp::path::end()
         .and(warp::get())
@@ -390,6 +454,7 @@ async fn main() -> Result<(), MainError> {
     let player = warp::path!("profile" / String)
         .and(warp::get())
         .and(database.clone())
+        .and(api_key.clone())
         .and_then(page_player);
 
     let search = warp::path!("search")
