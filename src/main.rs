@@ -1,6 +1,5 @@
 use askama::Template;
 use main_error::MainError;
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPool;
 use std::collections::HashSet;
@@ -346,19 +345,6 @@ async fn page_top_stats(pool: PgPool, order: TopOrder) -> Result<impl Reply, Rej
     Ok(warp::reply::html(template.render().unwrap()))
 }
 
-// {"response":{"steamid":"76561198024494988","success":1}}
-#[derive(Deserialize)]
-struct SteamApiResponse {
-    response: VanityUrlResponse,
-}
-
-#[derive(Deserialize)]
-struct VanityUrlResponse {
-    #[serde(default)]
-    steamid: String,
-    success: u8,
-}
-
 async fn resolve_vanity_url(
     database: &PgPool,
     url: &str,
@@ -371,16 +357,7 @@ async fn resolve_vanity_url(
         let steam_id: String = row.steam_id;
         Ok(Some(steam_id.parse()?))
     } else {
-        let response: SteamApiResponse = Client::new()
-            .get("http://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/")
-            .query(&[("key", api_key), ("vanityurl", url)])
-            .send()
-            .await?
-            .json()
-            .await?;
-
-        if response.response.success == 1 {
-            let steam_id: SteamID = response.response.steamid.parse()?;
+        if let Some(steam_id) = steam_resolve_vanity::resolve_vanity_url(url, api_key).await? {
             sqlx::query!(
                 r#"INSERT INTO vanity_urls(url, steam_id) VALUES($1, $2)"#,
                 url,
