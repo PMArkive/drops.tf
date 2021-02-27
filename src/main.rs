@@ -3,6 +3,7 @@ use main_error::MainError;
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPool;
 use std::collections::HashSet;
+use std::convert::TryInto;
 use std::error::Error;
 use std::fmt::{self, Debug, Display};
 use std::str::FromStr;
@@ -29,12 +30,6 @@ impl Debug for DropsError {
             source = error.source();
         }
         Ok(())
-    }
-}
-
-impl From<DropsError> for Rejection {
-    fn from(from: DropsError) -> Self {
-        warp::reject::custom(from)
     }
 }
 
@@ -111,7 +106,8 @@ async fn stats_for_user(steam_id: SteamID, database: &PgPool) -> Result<DropStat
     // for medics with more than 100 drops we have cached info
     if let Ok(result) = sqlx::query_as!(
         DropStats,
-        r#"SELECT steam_id, name, games, ubers, drops, medic_time, drops_rank, dpu_rank, dps_rank, dpg_rank
+        r#"SELECT steam_id as "steam_id!", name as "name!", games as "games!", ubers as "ubers!", drops as "drops!",
+        medic_time as "medic_time!", drops_rank as "drops_rank!", dpu_rank as "dpu_rank!", dps_rank as "dps_rank!", dpg_rank as "dpg_rank!"
         FROM ranked_medic_stats
         WHERE steam_id=$1"#,
         steam_id.steam3()
@@ -124,11 +120,11 @@ async fn stats_for_user(steam_id: SteamID, database: &PgPool) -> Result<DropStat
     // for other we need to recalculate
     let result = sqlx::query_as!(
         DropStats,
-        r#"SELECT user_names.steam_id, name, games, ubers, drops, medic_time,
-        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.drops > medic_stats.drops AND m2.drops > 100) + 1 AS drops_rank,
-        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpu > medic_stats.dpu AND m2.drops > 100) + 1 AS dpu_rank,
-        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dps > medic_stats.dps AND m2.drops > 100) + 1 AS dps_rank,
-        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpg > medic_stats.dpg AND m2.drops > 100) + 1 AS dpg_rank
+        r#"SELECT user_names.steam_id as "steam_id!", name as "name!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!",
+        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.drops > medic_stats.drops AND m2.drops > 100) + 1 AS "drops_rank!",
+        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpu > medic_stats.dpu AND m2.drops > 100) + 1 AS "dpu_rank!",
+        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dps > medic_stats.dps AND m2.drops > 100) + 1 AS "dps_rank!",
+        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpg > medic_stats.dpg AND m2.drops > 100) + 1 AS "dpg_rank!"
         FROM medic_stats
         INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
         WHERE medic_stats.steam_id=$1"#,
@@ -172,7 +168,7 @@ async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, 
         TopOrder::Drops => {
             sqlx::query_as!(
                 TopStats,
-                r#"SELECT steam_id, games, ubers, drops, medic_time, name
+                r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
                 FROM ranked_medic_stats
                 ORDER BY drops DESC LIMIT 25"#
             )
@@ -182,7 +178,7 @@ async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, 
         TopOrder::Dps => {
             sqlx::query_as!(
                 TopStats,
-                r#"SELECT steam_id, games, ubers, drops, medic_time, name
+                r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
                 FROM ranked_medic_stats
                 ORDER BY dps DESC LIMIT 25"#
             )
@@ -192,7 +188,7 @@ async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, 
         TopOrder::Dpu => {
             sqlx::query_as!(
                 TopStats,
-                r#"SELECT steam_id, games, ubers, drops, medic_time, name
+                r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
                 FROM ranked_medic_stats
                 ORDER BY dpu DESC LIMIT 25"#
             )
@@ -202,7 +198,7 @@ async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, 
         TopOrder::Dpg => {
             sqlx::query_as!(
                 TopStats,
-                r#"SELECT steam_id, games, ubers, drops, medic_time, name
+                r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
                 FROM ranked_medic_stats
                 ORDER BY dpg DESC LIMIT 25"#
             )
@@ -237,7 +233,7 @@ struct GlobalStats {
 async fn global_stats(database: &PgPool) -> Result<GlobalStats, DropsError> {
     let result = sqlx::query_as!(
         GlobalStats,
-        r#"SELECT drops, ubers, games
+        r#"SELECT drops as "drops!", ubers as "ubers!", games as "games!"
         FROM global_stats"#
     )
     .fetch_one(database)
@@ -263,7 +259,7 @@ impl SearchResult {
 async fn player_search(search: &str, database: &PgPool) -> Result<Vec<SearchResult>, DropsError> {
     let mut players: Vec<SearchResult> = sqlx::query_as!(
         SearchResult,
-        r#"SELECT steam_id, name, count, (1 - (name  <-> $1)) AS sim 
+        r#"SELECT steam_id as "steam_id!", name as "name!", count as "count!", (1 - (name  <-> $1)) AS "sim!" 
         FROM medic_names
         WHERE name ~* $1
         ORDER BY count DESC
@@ -355,7 +351,7 @@ async fn resolve_vanity_url(
         .await
     {
         let steam_id: String = row.steam_id;
-        Ok(Some(steam_id.parse()?))
+        Ok(Some(SteamID::from_steam3(&steam_id)?))
     } else {
         if let Some(steam_id) = steam_resolve_vanity::resolve_vanity_url(url, api_key).await? {
             sqlx::query!(
@@ -378,7 +374,7 @@ async fn page_player(
     pool: PgPool,
     api_key: String,
 ) -> Result<impl Reply, Rejection> {
-    let steam_id = match steam_id.parse().map_err(DropsError::from) {
+    let steam_id = match steam_id.as_str().try_into().map_err(DropsError::from) {
         Ok(steam_id) => steam_id,
         Err(e) => resolve_vanity_url(&pool, &steam_id, &api_key)
             .await?
@@ -396,7 +392,7 @@ async fn page_player(
 }
 
 async fn api_search(query: SearchParams, pool: PgPool) -> Result<impl Reply, Rejection> {
-    if let Ok(steam_id) = query.search.parse() {
+    if let Ok(steam_id) = query.search.as_str().try_into() {
         if let Some(name) = get_user_name(steam_id, &pool).await? {
             return Ok(warp::reply::json(&vec![SearchResult {
                 steam_id: steam_id.steam3(),
@@ -416,7 +412,7 @@ async fn main() -> Result<(), MainError> {
     let api_key = dotenv::var("STEAM_API_KEY")?;
     let port = u16::from_str(&dotenv::var("PORT")?)?;
 
-    let pool = PgPool::builder().max_size(2).build(&database_url).await?;
+    let pool = PgPool::connect(&database_url).await?;
 
     let database = warp::any().map(move || pool.clone());
 
