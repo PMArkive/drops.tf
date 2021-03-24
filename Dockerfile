@@ -8,9 +8,12 @@ RUN mkdir src && \
  cargo build --release && \
  rm -r src
 
-COPY src/ ./src/
+COPY src ./src/
+COPY templates ./templates/
 COPY sqlx-data.json ./
-RUN sudo chown -R rust:rust .
+RUN sudo chown -R rust:rust . && \
+ touch src/main.rs && \
+ cargo build --release
 
 FROM scratch
 
