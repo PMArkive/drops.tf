@@ -1,15 +1,29 @@
+use crate::search::api_search;
 use askama::Template;
 use main_error::MainError;
-use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPool;
-use std::collections::HashSet;
 use std::convert::TryInto;
 use std::error::Error;
 use std::fmt::{self, Debug, Display};
 use std::str::FromStr;
 use steamid_ng::SteamID;
+use tracing::instrument;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use warp::reject::Reject;
 use warp::{Filter, Rejection, Reply};
+
+mod search;
+
+macro_rules! named {
+    ($name:expr) => {
+        warp::trace(|info| tracing::info_span!(
+            $name,
+            method = %info.method(),
+            path = %info.path(),
+        ))
+    };
+}
 
 struct DropsError(Box<dyn Error + Send + Sync + 'static>);
 
@@ -102,6 +116,7 @@ impl DropStats {
     }
 }
 
+#[instrument(skip(database))]
 async fn stats_for_user(steam_id: SteamID, database: &PgPool) -> Result<DropStats, DropsError> {
     // for medics with more than 100 drops we have cached info
     if let Ok(result) = sqlx::query_as!(
@@ -163,6 +178,7 @@ impl TopStats {
     }
 }
 
+#[instrument(skip(database))]
 async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, DropsError> {
     let result = match order {
         TopOrder::Drops => {
@@ -172,8 +188,8 @@ async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, 
                 FROM ranked_medic_stats
                 ORDER BY drops DESC LIMIT 25"#
             )
-            .fetch_all(database)
-            .await?
+                .fetch_all(database)
+                .await?
         }
         TopOrder::Dps => {
             sqlx::query_as!(
@@ -182,8 +198,8 @@ async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, 
                 FROM ranked_medic_stats
                 ORDER BY dps DESC LIMIT 25"#
             )
-            .fetch_all(database)
-            .await?
+                .fetch_all(database)
+                .await?
         }
         TopOrder::Dpu => {
             sqlx::query_as!(
@@ -192,8 +208,8 @@ async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, 
                 FROM ranked_medic_stats
                 ORDER BY dpu DESC LIMIT 25"#
             )
-            .fetch_all(database)
-            .await?
+                .fetch_all(database)
+                .await?
         }
         TopOrder::Dpg => {
             sqlx::query_as!(
@@ -202,25 +218,12 @@ async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, 
                 FROM ranked_medic_stats
                 ORDER BY dpg DESC LIMIT 25"#
             )
-            .fetch_all(database)
-            .await?
+                .fetch_all(database)
+                .await?
         }
     };
 
     Ok(result)
-}
-
-async fn get_user_name(steam_id: SteamID, database: &PgPool) -> Result<Option<String>, DropsError> {
-    let result = sqlx::query!(
-        r#"SELECT name
-        FROM user_names
-        WHERE steam_id=$1"#,
-        steam_id.steam3()
-    )
-    .fetch_one(database)
-    .await?;
-
-    Ok(result.name)
 }
 
 #[derive(Debug)]
@@ -230,6 +233,7 @@ struct GlobalStats {
     games: i64,
 }
 
+#[instrument(skip(database))]
 async fn global_stats(database: &PgPool) -> Result<GlobalStats, DropsError> {
     let result = sqlx::query_as!(
         GlobalStats,
@@ -240,50 +244,6 @@ async fn global_stats(database: &PgPool) -> Result<GlobalStats, DropsError> {
     .await?;
 
     Ok(result)
-}
-
-#[derive(Debug, Serialize)]
-struct SearchResult {
-    steam_id: String,
-    name: String,
-    count: i64,
-    sim: f64,
-}
-
-impl SearchResult {
-    pub fn weight(&self) -> f64 {
-        self.sim * 5.0 + self.count as f64 * 1.0
-    }
-}
-
-async fn player_search(search: &str, database: &PgPool) -> Result<Vec<SearchResult>, DropsError> {
-    let mut players: Vec<SearchResult> = sqlx::query_as!(
-        SearchResult,
-        r#"SELECT steam_id as "steam_id!", name as "name!", count as "count!", (1 - (name  <-> $1)) AS "sim!" 
-        FROM medic_names
-        WHERE name ~* $1
-        ORDER BY count DESC
-        LIMIT 50"#,
-        search
-    )
-    .fetch_all(database)
-    .await?;
-
-    players.sort_by(|a, b| b.weight().partial_cmp(&a.weight()).unwrap());
-
-    let mut found = HashSet::new();
-
-    Ok(players
-        .into_iter()
-        .filter(|player| {
-            if !found.contains(&player.steam_id) {
-                found.insert(player.steam_id.clone());
-                true
-            } else {
-                false
-            }
-        })
-        .collect())
 }
 
 #[derive(Template)]
@@ -307,11 +267,7 @@ struct NotFoundTemplate;
 #[template(path = "404.html")]
 struct PageNotFoundTemplate;
 
-#[derive(Deserialize)]
-struct SearchParams {
-    search: String,
-}
-
+#[derive(Debug)]
 enum TopOrder {
     Drops,
     Dps,
@@ -334,6 +290,7 @@ impl Display for TopOrder {
     }
 }
 
+#[instrument(skip(pool))]
 async fn page_top_stats(pool: PgPool, order: TopOrder) -> Result<impl Reply, Rejection> {
     let top = top_stats(&pool, order).await?;
     let stats = global_stats(&pool).await?;
@@ -341,6 +298,7 @@ async fn page_top_stats(pool: PgPool, order: TopOrder) -> Result<impl Reply, Rej
     Ok(warp::reply::html(template.render().unwrap()))
 }
 
+#[instrument(skip(database, api_key))]
 async fn resolve_vanity_url(
     database: &PgPool,
     url: &str,
@@ -369,6 +327,7 @@ async fn resolve_vanity_url(
     }
 }
 
+#[instrument(skip(pool, api_key))]
 async fn page_player(
     steam_id: String,
     pool: PgPool,
@@ -391,23 +350,19 @@ async fn page_player(
     Ok(warp::reply::html(template.render().unwrap()))
 }
 
-async fn api_search(query: SearchParams, pool: PgPool) -> Result<impl Reply, Rejection> {
-    if let Ok(steam_id) = query.search.as_str().try_into() {
-        if let Some(name) = get_user_name(steam_id, &pool).await? {
-            return Ok(warp::reply::json(&vec![SearchResult {
-                steam_id: steam_id.steam3(),
-                name,
-                count: 1,
-                sim: 1.0,
-            }]));
-        }
-    }
-    let result = player_search(&query.search, &pool).await?;
-    Ok(warp::reply::json(&result))
-}
-
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
+    if let Ok(tracing_endpoint) = dotenv::var("TRACING_ENDPOINT") {
+        let tracer = opentelemetry_jaeger::new_pipeline()
+            .with_agent_endpoint(tracing_endpoint)
+            .with_service_name("drops.tf")
+            .install_simple()?;
+        let open_telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+        tracing_subscriber::registry()
+            .with(open_telemetry)
+            .try_init()?;
+    }
+
     let database_url = dotenv::var("DATABASE_URL")?;
     let api_key = dotenv::var("STEAM_API_KEY")?;
     let port = u16::from_str(&dotenv::var("PORT")?)?;
@@ -421,34 +376,40 @@ async fn main() -> Result<(), MainError> {
     let index = warp::path::end()
         .and(warp::get())
         .and(database.clone())
-        .and_then(move |pool| page_top_stats(pool, TopOrder::Drops));
+        .and_then(move |pool| page_top_stats(pool, TopOrder::Drops))
+        .with(named!("index"));
 
     let dpg = warp::path::path("dpg")
         .and(warp::get())
         .and(database.clone())
-        .and_then(move |pool| page_top_stats(pool, TopOrder::Dpg));
+        .and_then(move |pool| page_top_stats(pool, TopOrder::Dpg))
+        .with(named!("dpg"));
 
     let dps = warp::path::path("dph")
         .and(warp::get())
         .and(database.clone())
-        .and_then(move |pool| page_top_stats(pool, TopOrder::Dps));
+        .and_then(move |pool| page_top_stats(pool, TopOrder::Dps))
+        .with(named!("dph"));
 
     let dpu = warp::path::path("dpu")
         .and(warp::get())
         .and(database.clone())
-        .and_then(move |pool| page_top_stats(pool, TopOrder::Dpu));
+        .and_then(move |pool| page_top_stats(pool, TopOrder::Dpu))
+        .with(named!("dpu"));
 
     let player = warp::path!("profile" / String)
         .and(warp::get())
         .and(database.clone())
         .and(api_key.clone())
-        .and_then(page_player);
+        .and_then(page_player)
+        .with(named!("profile"));
 
     let search = warp::path!("search")
         .and(warp::get())
         .and(warp::query())
         .and(database.clone())
-        .and_then(api_search);
+        .and_then(api_search)
+        .with(named!("search"));
 
     let not_found = warp::any().map(|| {
         return Ok(warp::reply::html(PageNotFoundTemplate.render().unwrap()));
