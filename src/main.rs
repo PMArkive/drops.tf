@@ -1,11 +1,14 @@
 use crate::search::api_search;
 use askama::Template;
 use main_error::MainError;
+use moka::future::Cache;
 use sqlx::postgres::PgPool;
 use std::convert::TryInto;
 use std::error::Error;
 use std::fmt::{self, Debug, Display};
 use std::str::FromStr;
+use std::sync::Arc;
+use std::time::Duration;
 use steamid_ng::SteamID;
 use tracing::instrument;
 use tracing_subscriber::layer::SubscriberExt;
@@ -151,7 +154,7 @@ async fn stats_for_user(steam_id: SteamID, database: &PgPool) -> Result<DropStat
     Ok(result)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct TopStats {
     steam_id: String,
     name: String,
@@ -178,78 +181,91 @@ impl TopStats {
     }
 }
 
-#[instrument(skip(database))]
-async fn top_stats(database: &PgPool, order: TopOrder) -> Result<Vec<TopStats>, DropsError> {
-    let result = match order {
-        TopOrder::Drops => {
-            sqlx::query_as!(
-                TopStats,
-                r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
-                FROM ranked_medic_stats
-                ORDER BY drops DESC LIMIT 25"#
-            )
-                .fetch_all(database)
-                .await?
-        }
-        TopOrder::Dps => {
-            sqlx::query_as!(
-                TopStats,
-                r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
-                FROM ranked_medic_stats
-                ORDER BY dps DESC LIMIT 25"#
-            )
-                .fetch_all(database)
-                .await?
-        }
-        TopOrder::Dpu => {
-            sqlx::query_as!(
-                TopStats,
-                r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
-                FROM ranked_medic_stats
-                ORDER BY dpu DESC LIMIT 25"#
-            )
-                .fetch_all(database)
-                .await?
-        }
-        TopOrder::Dpg => {
-            sqlx::query_as!(
-                TopStats,
-                r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
-                FROM ranked_medic_stats
-                ORDER BY dpg DESC LIMIT 25"#
-            )
-                .fetch_all(database)
-                .await?
-        }
-    };
+#[instrument(skip(database, cache))]
+async fn top_stats(
+    database: &PgPool,
+    order: TopOrder,
+    cache: Cache<TopOrder, Arc<Vec<TopStats>>>,
+) -> Result<Arc<Vec<TopStats>>, DropsError> {
+    let result = cache.try_get_with::<_, sqlx::Error>(order, async {
+        let result = match order {
+            TopOrder::Drops => {
+                sqlx::query_as!(
+                    TopStats,
+                    r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
+                    FROM ranked_medic_stats
+                    ORDER BY drops DESC LIMIT 25"#
+                )
+                    .fetch_all(database)
+                    .await?
+            }
+            TopOrder::Dps => {
+                sqlx::query_as!(
+                    TopStats,
+                    r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
+                    FROM ranked_medic_stats
+                    ORDER BY dps DESC LIMIT 25"#
+                )
+                    .fetch_all(database)
+                    .await?
+            }
+            TopOrder::Dpu => {
+                sqlx::query_as!(
+                    TopStats,
+                    r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
+                    FROM ranked_medic_stats
+                    ORDER BY dpu DESC LIMIT 25"#
+                )
+                    .fetch_all(database)
+                    .await?
+            }
+            TopOrder::Dpg => {
+                sqlx::query_as!(
+                    TopStats,
+                    r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
+                    FROM ranked_medic_stats
+                    ORDER BY dpg DESC LIMIT 25"#
+                )
+                    .fetch_all(database)
+                    .await?
+            }
+        };
+        Ok(Arc::new(result))
+    }).await?;
 
     Ok(result)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct GlobalStats {
     drops: i64,
     ubers: i64,
     games: i64,
 }
 
-#[instrument(skip(database))]
-async fn global_stats(database: &PgPool) -> Result<GlobalStats, DropsError> {
-    let result = sqlx::query_as!(
-        GlobalStats,
-        r#"SELECT drops as "drops!", ubers as "ubers!", games as "games!"
-        FROM global_stats"#
-    )
-    .fetch_one(database)
-    .await?;
+#[instrument(skip(database, cache))]
+async fn global_stats(
+    database: &PgPool,
+    cache: Cache<(), GlobalStats>,
+) -> Result<GlobalStats, DropsError> {
+    let result = cache
+        .try_get_with(
+            (),
+            sqlx::query_as!(
+                GlobalStats,
+                r#"SELECT drops as "drops!", ubers as "ubers!", games as "games!" FROM global_stats"#
+            )
+                .fetch_one(database),
+        )
+        .await?;
 
     Ok(result)
 }
 
 #[derive(Template)]
 #[template(path = "index.html")]
-struct IndexTemplate {
-    top: Vec<TopStats>,
+struct IndexTemplate<'a> {
+    top: &'a [TopStats],
     stats: GlobalStats,
 }
 
@@ -267,7 +283,7 @@ struct NotFoundTemplate;
 #[template(path = "404.html")]
 struct PageNotFoundTemplate;
 
-#[derive(Debug)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone, Copy)]
 enum TopOrder {
     Drops,
     Dps,
@@ -290,11 +306,19 @@ impl Display for TopOrder {
     }
 }
 
-#[instrument(skip(pool))]
-async fn page_top_stats(pool: PgPool, order: TopOrder) -> Result<impl Reply, Rejection> {
-    let top = top_stats(&pool, order).await?;
-    let stats = global_stats(&pool).await?;
-    let template = IndexTemplate { top, stats };
+#[instrument(skip(pool, global_cache, top_cache))]
+async fn page_top_stats(
+    pool: PgPool,
+    order: TopOrder,
+    top_cache: Cache<TopOrder, Arc<Vec<TopStats>>>,
+    global_cache: Cache<(), GlobalStats>,
+) -> Result<impl Reply, Rejection> {
+    let top = top_stats(&pool, order, top_cache).await?;
+    let stats = global_stats(&pool, global_cache).await?;
+    let template = IndexTemplate {
+        top: top.as_slice(),
+        stats,
+    };
     Ok(warp::reply::html(template.render().unwrap()))
 }
 
@@ -373,28 +397,56 @@ async fn main() -> Result<(), MainError> {
 
     let api_key = warp::any().map(move || api_key.clone());
 
+    let global_cache = Cache::builder()
+        .time_to_live(Duration::from_secs(15 * 60))
+        .time_to_idle(Duration::from_secs(5 * 60))
+        .build();
+    let global_cache = warp::any().map(move || global_cache.clone());
+
+    let top_cache = Cache::builder()
+        .time_to_live(Duration::from_secs(5 * 60))
+        .time_to_idle(Duration::from_secs(60))
+        .build();
+    let top_cache = warp::any().map(move || top_cache.clone());
+
     let index = warp::path::end()
         .and(warp::get())
         .and(database.clone())
-        .and_then(move |pool| page_top_stats(pool, TopOrder::Drops))
+        .and(top_cache.clone())
+        .and(global_cache.clone())
+        .and_then(move |pool, top_cache, global_cache| {
+            page_top_stats(pool, TopOrder::Drops, top_cache, global_cache)
+        })
         .with(named!("index"));
 
     let dpg = warp::path::path("dpg")
         .and(warp::get())
         .and(database.clone())
-        .and_then(move |pool| page_top_stats(pool, TopOrder::Dpg))
+        .and(top_cache.clone())
+        .and(global_cache.clone())
+        .and_then(move |pool, top_cache, global_cache| {
+            page_top_stats(pool, TopOrder::Dpg, top_cache, global_cache)
+        })
         .with(named!("dpg"));
 
     let dps = warp::path::path("dph")
         .and(warp::get())
         .and(database.clone())
-        .and_then(move |pool| page_top_stats(pool, TopOrder::Dps))
+        .and(top_cache.clone())
+        .and(global_cache.clone())
+        .and_then(move |pool, top_cache, global_cache| {
+            page_top_stats(pool, TopOrder::Dps, top_cache, global_cache)
+        })
         .with(named!("dph"));
 
     let dpu = warp::path::path("dpu")
         .and(warp::get())
         .and(database.clone())
-        .and_then(move |pool| page_top_stats(pool, TopOrder::Dpu))
+        .and(top_cache.clone())
+        .and(global_cache.clone())
+        .and_then(move |pool, top_cache, global_cache| {
+            page_top_stats(pool, TopOrder::Dpu, top_cache, global_cache)
+        })
         .with(named!("dpu"));
 
     let player = warp::path!("profile" / String)
