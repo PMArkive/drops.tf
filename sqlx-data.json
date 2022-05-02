@@ -1,7 +1,55 @@
 {
   "db": "PostgreSQL",
-  "36fb73cd66580d38ef67253165f1c123c383fbfb496fbc4e8aad75d5c735aa52": {
-    "query": "SELECT steam_id as \"steam_id!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                FROM ranked_medic_stats\n                ORDER BY dpg DESC LIMIT 25",
+  "109b2cf4501771213784eaef1034168e5a9b55dabd876f7f52f269216518c98a": {
+    "query": "SELECT steam_id as \"steam_id!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                    FROM ranked_medic_stats\n                    ORDER BY dpg DESC LIMIT 25",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "steam_id!",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 1,
+          "name": "games!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "ubers!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "drops!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "medic_time!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "name!",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  },
+  "23fdd8c6fd2e4898b59ccf2cf81842de138dac4430cfcc18218c0c52b29c1c67": {
+    "query": "SELECT steam_id as \"steam_id!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                    FROM ranked_medic_stats\n                    ORDER BY dps DESC LIMIT 25",
     "describe": {
       "columns": [
         {
@@ -142,102 +190,6 @@
       ]
     }
   },
-  "4cf58a10ec902d22d15e6c3f0139e2ca6364d308b025751a992acee4f171ddea": {
-    "query": "SELECT steam_id as \"steam_id!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                FROM ranked_medic_stats\n                ORDER BY dpu DESC LIMIT 25",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "steam_id!",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 1,
-          "name": "games!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "ubers!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "drops!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "medic_time!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "name!",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        true,
-        true,
-        true,
-        true,
-        true,
-        true
-      ]
-    }
-  },
-  "60768289fa04d11c294119ba54f1a39f0446f1e11c52507ae32b7f6f1dad3e79": {
-    "query": "SELECT steam_id as \"steam_id!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                FROM ranked_medic_stats\n                ORDER BY drops DESC LIMIT 25",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "steam_id!",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 1,
-          "name": "games!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "ubers!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "drops!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "medic_time!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "name!",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        true,
-        true,
-        true,
-        true,
-        true,
-        true
-      ]
-    }
-  },
   "6ac6f586f743e77e551a3107476586bdefdf159d0c2b03aec070e5986743df0d": {
     "query": "SELECT steam_id as \"steam_id!\", name as \"name!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\",\n        medic_time as \"medic_time!\", drops_rank as \"drops_rank!\", dpu_rank as \"dpu_rank!\", dps_rank as \"dps_rank!\", dpg_rank as \"dpg_rank!\"\n        FROM ranked_medic_stats\n        WHERE steam_id=$1",
     "describe": {
@@ -312,8 +264,28 @@
       ]
     }
   },
-  "6e5a0c9c148952eba75542c1c5f4d185b4fdd07fb840e37702f27d54d19307cd": {
-    "query": "SELECT steam_id as \"steam_id!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                FROM ranked_medic_stats\n                ORDER BY dps DESC LIMIT 25",
+  "92838e6703b1ec47d38657cc88505b0471acdd64e736efa34f210c7eb9733711": {
+    "query": "SELECT steam_id FROM vanity_urls WHERE url=$1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "steam_id",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
+  "b50a9f62fe45569336fa66af0957fae4224558ceacc2039eac3454b7f4f554a9": {
+    "query": "SELECT steam_id as \"steam_id!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                    FROM ranked_medic_stats\n                    ORDER BY drops DESC LIMIT 25",
     "describe": {
       "columns": [
         {
@@ -360,8 +332,56 @@
       ]
     }
   },
-  "8ffcd5d0d8f5f0c528cc8aaa4552805701bfbdaec631a22b382840309ddf1ce2": {
-    "query": "SELECT drops as \"drops!\", ubers as \"ubers!\", games as \"games!\"\n        FROM global_stats",
+  "b80c5a13dfcc9d3b895705fa1068829e58de33d4ed872e89be0a498f84b77be7": {
+    "query": "SELECT steam_id as \"steam_id!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                    FROM ranked_medic_stats\n                    ORDER BY dpu DESC LIMIT 25",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "steam_id!",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 1,
+          "name": "games!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "ubers!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "drops!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "medic_time!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "name!",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  },
+  "bd1f990126fdc9215aeb3fb7f940a556c76fe650095dadaf81e2d7457b776b10": {
+    "query": "SELECT drops as \"drops!\", ubers as \"ubers!\", games as \"games!\" FROM global_stats",
     "describe": {
       "columns": [
         {
@@ -387,26 +407,6 @@
         true,
         true,
         true
-      ]
-    }
-  },
-  "92838e6703b1ec47d38657cc88505b0471acdd64e736efa34f210c7eb9733711": {
-    "query": "SELECT steam_id FROM vanity_urls WHERE url=$1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "steam_id",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        false
       ]
     }
   },
