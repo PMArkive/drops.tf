@@ -18,16 +18,6 @@ use warp::{Filter, Rejection, Reply};
 
 mod search;
 
-macro_rules! named {
-    ($name:expr) => {
-        warp::trace(|info| tracing::info_span!(
-            $name,
-            method = %info.method(),
-            path = %info.path(),
-        ))
-    };
-}
-
 struct DropsError(Box<dyn Error + Send + Sync + 'static>);
 
 impl<E: Into<Box<dyn Error + Send + Sync + 'static>>> From<E> for DropsError {
@@ -416,8 +406,7 @@ async fn main() -> Result<(), MainError> {
         .and(global_cache.clone())
         .and_then(move |pool, top_cache, global_cache| {
             page_top_stats(pool, TopOrder::Drops, top_cache, global_cache)
-        })
-        .with(named!("index"));
+        });
 
     let dpg = warp::path::path("dpg")
         .and(warp::get())
@@ -426,8 +415,7 @@ async fn main() -> Result<(), MainError> {
         .and(global_cache.clone())
         .and_then(move |pool, top_cache, global_cache| {
             page_top_stats(pool, TopOrder::Dpg, top_cache, global_cache)
-        })
-        .with(named!("dpg"));
+        });
 
     let dps = warp::path::path("dph")
         .and(warp::get())
@@ -436,8 +424,7 @@ async fn main() -> Result<(), MainError> {
         .and(global_cache.clone())
         .and_then(move |pool, top_cache, global_cache| {
             page_top_stats(pool, TopOrder::Dps, top_cache, global_cache)
-        })
-        .with(named!("dph"));
+        });
 
     let dpu = warp::path::path("dpu")
         .and(warp::get())
@@ -446,22 +433,19 @@ async fn main() -> Result<(), MainError> {
         .and(global_cache.clone())
         .and_then(move |pool, top_cache, global_cache| {
             page_top_stats(pool, TopOrder::Dpu, top_cache, global_cache)
-        })
-        .with(named!("dpu"));
+        });
 
     let player = warp::path!("profile" / String)
         .and(warp::get())
         .and(database.clone())
         .and(api_key.clone())
-        .and_then(page_player)
-        .with(named!("profile"));
+        .and_then(page_player);
 
     let search = warp::path!("search")
         .and(warp::get())
         .and(warp::query())
         .and(database.clone())
-        .and_then(api_search)
-        .with(named!("search"));
+        .and_then(api_search);
 
     let not_found = warp::any().map(|| {
         return Ok(warp::reply::html(PageNotFoundTemplate.render().unwrap()));
