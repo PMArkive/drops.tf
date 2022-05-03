@@ -1,6 +1,4 @@
-use crate::data::{
-    DataSource, DropStats, GlobalStats, SearchParams, SearchResult, TopOrder, TopStats,
-};
+use crate::data::{DataSource, DropStats, GlobalStats, SearchParams, TopOrder, TopStats};
 use askama::Template;
 use main_error::MainError;
 use sqlx::postgres::PgPool;
@@ -92,16 +90,6 @@ pub async fn api_search(
     data_source: DataSource,
     query: SearchParams,
 ) -> Result<impl Reply, Rejection> {
-    if let Ok(steam_id) = query.search.as_str().try_into() {
-        if let Some(name) = data_source.get_user_name(steam_id).await? {
-            return Ok(warp::reply::json(&vec![SearchResult {
-                steam_id: steam_id.steam3(),
-                name,
-                count: 1,
-                sim: 1.0,
-            }]));
-        }
-    }
     let result = data_source.player_search(&query.search).await?;
     Ok(warp::reply::json(&result))
 }

@@ -3,6 +3,7 @@ use moka::future::Cache;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::collections::HashSet;
+use std::convert::TryInto;
 use std::fmt;
 use std::fmt::Display;
 use std::sync::Arc;
@@ -50,6 +51,21 @@ impl DataSource {
 
     #[instrument(skip(self))]
     pub async fn player_search(&self, search: &str) -> Result<Vec<SearchResult>, DropsError> {
+        if let Ok(steam_id) = search.try_into() {
+            if let Some(name) = self.get_user_name(steam_id).await? {
+                return Ok(vec![SearchResult {
+                    steam_id: steam_id.steam3(),
+                    name,
+                    count: 1,
+                    sim: 1.0,
+                }]);
+            }
+        }
+        self.player_wildcard_search(search).await
+    }
+
+    #[instrument(skip(self))]
+    async fn player_wildcard_search(&self, search: &str) -> Result<Vec<SearchResult>, DropsError> {
         let mut players: Vec<SearchResult> = sqlx::query_as!(
         SearchResult,
         r#"SELECT steam_id as "steam_id!", name as "name!", count as "count!", (1 - (name  <-> $1)) AS "sim!" 
