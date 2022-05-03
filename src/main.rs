@@ -1,16 +1,21 @@
 use crate::data::{DataSource, DropStats, GlobalStats, SearchParams, TopOrder, TopStats};
 use askama::Template;
+use axum::extract::{Path, Query};
+use axum::http::StatusCode;
+use axum::response::{Html, IntoResponse, Response};
+use axum::routing::get;
+use axum::{Extension, Json, Router};
 use main_error::MainError;
 use sqlx::postgres::PgPool;
 use std::convert::TryInto;
 use std::error::Error;
 use std::fmt::{self, Debug, Display};
+use std::net::SocketAddr;
 use std::str::FromStr;
+use tower_http::trace::TraceLayer;
 use tracing::instrument;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use warp::reject::Reject;
-use warp::{Filter, Rejection, Reply};
 
 mod data;
 
@@ -22,8 +27,6 @@ impl<E: Into<Box<dyn Error + Send + Sync + 'static>>> From<E> for DropsError {
     }
 }
 
-impl Reject for DropsError {}
-
 impl Debug for DropsError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         Display::fmt(&self.0, f)?;
@@ -33,6 +36,12 @@ impl Debug for DropsError {
             source = error.source();
         }
         Ok(())
+    }
+}
+
+impl IntoResponse for DropsError {
+    fn into_response(self) -> Response {
+        (StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}", self)).into_response()
     }
 }
 
@@ -58,18 +67,25 @@ struct NotFoundTemplate;
 struct PageNotFoundTemplate;
 
 #[instrument(skip(data_source))]
-async fn page_top_stats(data_source: DataSource, order: TopOrder) -> Result<impl Reply, Rejection> {
+async fn page_top_stats(
+    Extension(data_source): Extension<DataSource>,
+    order: TopOrder,
+) -> Result<impl IntoResponse, DropsError> {
     let top = data_source.top_stats(order).await?;
     let stats = data_source.global_stats().await?;
     let template = IndexTemplate {
         top: top.as_slice(),
         stats,
     };
-    Ok(warp::reply::html(template.render().unwrap()))
+
+    Ok(Html(template.render().unwrap()))
 }
 
 #[instrument(skip(data_source))]
-async fn page_player(data_source: DataSource, steam_id: String) -> Result<impl Reply, Rejection> {
+async fn page_player(
+    Extension(data_source): Extension<DataSource>,
+    Path(steam_id): Path<String>,
+) -> Result<impl IntoResponse, DropsError> {
     let steam_id = match steam_id.as_str().try_into().map_err(DropsError::from) {
         Ok(steam_id) => steam_id,
         Err(e) => data_source.resolve_vanity_url(&steam_id).await?.ok_or(e)?,
@@ -78,20 +94,20 @@ async fn page_player(data_source: DataSource, steam_id: String) -> Result<impl R
         Ok(stats) => stats,
         Err(_) => {
             let template = NotFoundTemplate;
-            return Ok(warp::reply::html(template.render().unwrap()));
+            return Ok(Html(template.render().unwrap()));
         }
     };
     let template = PlayerTemplate { stats };
-    Ok(warp::reply::html(template.render().unwrap()))
+    Ok(Html(template.render().unwrap()))
 }
 
 #[instrument(skip(data_source))]
 pub async fn api_search(
-    data_source: DataSource,
-    query: SearchParams,
-) -> Result<impl Reply, Rejection> {
+    Extension(data_source): Extension<DataSource>,
+    Query(query): Query<SearchParams>,
+) -> Result<impl IntoResponse, DropsError> {
     let result = data_source.player_search(&query.search).await?;
-    Ok(warp::reply::json(&result))
+    Ok(Json(result))
 }
 
 #[tokio::main]
@@ -114,54 +130,38 @@ async fn main() -> Result<(), MainError> {
     let pool = PgPool::connect(&database_url).await?;
     let data_source = DataSource::new(pool, api_key);
 
-    let data_source = warp::any().map(move || data_source.clone());
+    let app = Router::new()
+        .route(
+            "/",
+            get(|data_source| page_top_stats(data_source, TopOrder::Drops)),
+        )
+        .route(
+            "/dpg",
+            get(|data_source| page_top_stats(data_source, TopOrder::Dpg)),
+        )
+        .route(
+            "/dph",
+            get(|data_source| page_top_stats(data_source, TopOrder::Dps)),
+        )
+        .route(
+            "/dpu",
+            get(|data_source| page_top_stats(data_source, TopOrder::Dpu)),
+        )
+        .route("/profile/:steam_id", get(page_player))
+        .route("/search", get(api_search))
+        .layer(Extension(data_source))
+        .layer(TraceLayer::new_for_http());
 
-    let index = warp::path::end()
-        .and(warp::get())
-        .and(data_source.clone())
-        .and_then(move |data_source| page_top_stats(data_source, TopOrder::Drops));
+    // let not_found = warp::any().map(|| {
+    //     return Ok(warp::reply::html(PageNotFoundTemplate.render().unwrap()));
+    // });
 
-    let dpg = warp::path::path("dpg")
-        .and(warp::get())
-        .and(data_source.clone())
-        .and_then(move |data_source| page_top_stats(data_source, TopOrder::Dpg));
-
-    let dps = warp::path::path("dph")
-        .and(warp::get())
-        .and(data_source.clone())
-        .and_then(move |data_source| page_top_stats(data_source, TopOrder::Dps));
-
-    let dpu = warp::path::path("dpu")
-        .and(warp::get())
-        .and(data_source.clone())
-        .and_then(move |data_source| page_top_stats(data_source, TopOrder::Dpu));
-
-    let player = warp::path!("profile" / String)
-        .and(warp::get())
-        .and(data_source.clone())
-        .and_then(|steam_id, data_source| page_player(data_source, steam_id));
-
-    let search = warp::path!("search")
-        .and(warp::get())
-        .and(data_source.clone())
-        .and(warp::query())
-        .and_then(api_search);
-
-    let not_found = warp::any().map(|| {
-        return Ok(warp::reply::html(PageNotFoundTemplate.render().unwrap()));
-    });
-
-    warp::serve(
-        index
-            .or(dpg)
-            .or(dpu)
-            .or(dps)
-            .or(player)
-            .or(search)
-            .or(not_found),
-    )
-    .run(([0, 0, 0, 0], port))
-    .await;
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    tracing::debug!("listening on {}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 
     Ok(())
 }
