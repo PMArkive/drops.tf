@@ -425,6 +425,7 @@ dependencies = [
  "sqlx",
  "steam-resolve-vanity",
  "steamid-ng",
+ "thiserror",
  "tokio",
  "tower-http 0.2.5",
  "tracing",

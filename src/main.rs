@@ -8,10 +8,11 @@ use axum::{Extension, Json, Router};
 use main_error::MainError;
 use sqlx::postgres::PgPool;
 use std::convert::TryInto;
-use std::error::Error;
-use std::fmt::{self, Debug, Display};
+use std::fmt::Debug;
 use std::net::SocketAddr;
 use std::str::FromStr;
+use std::sync::Arc;
+use thiserror::Error;
 use tower_http::trace::TraceLayer;
 use tracing::instrument;
 use tracing_subscriber::layer::SubscriberExt;
@@ -19,29 +20,25 @@ use tracing_subscriber::util::SubscriberInitExt;
 
 mod data;
 
-pub struct DropsError(Box<dyn Error + Send + Sync + 'static>);
-
-impl<E: Into<Box<dyn Error + Send + Sync + 'static>>> From<E> for DropsError {
-    fn from(e: E) -> Self {
-        DropsError(e.into())
-    }
-}
-
-impl Debug for DropsError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        Display::fmt(&self.0, f)?;
-        let mut source = self.0.source();
-        while let Some(error) = source {
-            write!(f, "\ncaused by: {}", error)?;
-            source = error.source();
-        }
-        Ok(())
-    }
+#[derive(Debug, Error)]
+pub enum DropsError {
+    #[error(transparent)]
+    SteamId(#[from] steamid_ng::SteamIDError),
+    #[error(transparent)]
+    Database(#[from] sqlx::Error),
+    #[error(transparent)]
+    DatabaseArc(#[from] Arc<sqlx::Error>),
+    #[error("Error while resolving steam url")]
+    Steam(#[from] steam_resolve_vanity::Error),
 }
 
 impl IntoResponse for DropsError {
     fn into_response(self) -> Response {
-        (StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}", self)).into_response()
+        let status = match &self {
+            DropsError::SteamId(_) => StatusCode::BAD_REQUEST,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        (status, format!("{}", self)).into_response()
     }
 }
 
