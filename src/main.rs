@@ -17,6 +17,7 @@ use tower_http::trace::TraceLayer;
 use tracing::instrument;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::Layer;
 
 mod data;
 
@@ -116,7 +117,16 @@ async fn main() -> Result<(), MainError> {
             .install_simple()?;
         let open_telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
         tracing_subscriber::registry()
+            .with(tracing_subscriber::EnvFilter::new(
+                std::env::var("RUST_LOG")
+                    .unwrap_or_else(|_| "dropstf=debug,tower_http=debug,sqlx=debug".into()),
+            ))
             .with(open_telemetry)
+            .with(
+                tracing_subscriber::fmt::layer().with_filter(tracing_subscriber::EnvFilter::new(
+                    std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".into()),
+                )),
+            )
             .try_init()?;
     }
 

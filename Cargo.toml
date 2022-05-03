@@ -18,7 +18,7 @@ tracing = "0.1.33"
 tracing-opentelemetry = "0.17.2"
 opentelemetry = "0.17.0"
 opentelemetry-jaeger = "0.16.0"
-tracing-subscriber = "0.3.11"
+tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
 moka = { version = "0.8.1", features = ["future"] }
 axum = "0.5.1"
 tower-http = { version = "0.2.5", features = ["trace"] }
