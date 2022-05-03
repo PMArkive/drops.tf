@@ -1,6 +1,7 @@
 use crate::data::{DataSource, DropStats, GlobalStats, SearchParams, TopOrder, TopStats};
 use askama::Template;
 use axum::extract::{Path, Query};
+use axum::handler::Handler;
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get;
@@ -31,6 +32,8 @@ pub enum DropsError {
     DatabaseArc(#[from] Arc<sqlx::Error>),
     #[error("Error while resolving steam url")]
     Steam(#[from] steam_resolve_vanity::Error),
+    #[error("Error while rendering template")]
+    Template(#[from] askama::Error),
 }
 
 impl IntoResponse for DropsError {
@@ -76,7 +79,7 @@ async fn page_top_stats(
         stats,
     };
 
-    Ok(Html(template.render().unwrap()))
+    Ok(Html(template.render()?))
 }
 
 #[instrument(skip(data_source))]
@@ -92,11 +95,11 @@ async fn page_player(
         Ok(stats) => stats,
         Err(_) => {
             let template = NotFoundTemplate;
-            return Ok(Html(template.render().unwrap()));
+            return Ok(Html(template.render()?));
         }
     };
     let template = PlayerTemplate { stats };
-    Ok(Html(template.render().unwrap()))
+    Ok(Html(template.render()?))
 }
 
 #[instrument(skip(data_source))]
@@ -106,6 +109,11 @@ pub async fn api_search(
 ) -> Result<impl IntoResponse, DropsError> {
     let result = data_source.player_search(&query.search).await?;
     Ok(Json(result))
+}
+
+async fn handler_404() -> impl IntoResponse {
+    let template = PageNotFoundTemplate;
+    (StatusCode::NOT_FOUND, Html(template.render().unwrap()))
 }
 
 #[tokio::main]
@@ -157,7 +165,8 @@ async fn main() -> Result<(), MainError> {
         .route("/profile/:steam_id", get(page_player))
         .route("/search", get(api_search))
         .layer(Extension(data_source))
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
+        .fallback(handler_404.into_service());
 
     // let not_found = warp::any().map(|| {
     //     return Ok(warp::reply::html(PageNotFoundTemplate.render().unwrap()));
