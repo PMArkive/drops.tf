@@ -14,6 +14,7 @@ use tracing::instrument;
 pub struct DataSource {
     global_cache: Cache<(), GlobalStats>,
     top_cache: Cache<TopOrder, Arc<Vec<TopStats>>>,
+    player_cache: Cache<SteamId, DropStats>,
     database: PgPool,
     api_key: String,
 }
@@ -26,8 +27,13 @@ impl DataSource {
                 .time_to_idle(Duration::from_secs(5 * 60))
                 .build(),
             top_cache: Cache::builder()
-                .time_to_live(Duration::from_secs(5 * 60))
-                .time_to_idle(Duration::from_secs(60))
+                .time_to_live(Duration::from_secs(15 * 60))
+                .time_to_idle(Duration::from_secs(5 * 60))
+                .build(),
+            player_cache: Cache::builder()
+                .time_to_live(Duration::from_secs(15 * 60))
+                .time_to_idle(Duration::from_secs(5 * 60))
+                .max_capacity(1024)
                 .build(),
             database,
             api_key,
@@ -94,36 +100,37 @@ impl DataSource {
 
     #[instrument(skip(self))]
     pub async fn stats_for_user(&self, steam_id: SteamId) -> Result<DropStats, DropsError> {
-        // for medics with more than 100 drops we have cached info
-        if let Ok(result) = sqlx::query_as!(
-            DropStats,
-            r#"SELECT steam_id as "steam_id!: _", name as "name!", games as "games!", ubers as "ubers!", drops as "drops!",
-            medic_time as "medic_time!", drops_rank as "drops_rank!", dpu_rank as "dpu_rank!", dps_rank as "dps_rank!", dpg_rank as "dpg_rank!"
-            FROM ranked_medic_stats
-            WHERE steam_id=$1"#,
-            steam_id.steam3()
-        )
-            .fetch_one(&self.database)
-            .await {
-            return Ok(result);
-        }
-
-        // for other we need to recalculate
-        let result = sqlx::query_as!(
-            DropStats,
-            r#"SELECT user_names.steam_id as "steam_id!: _", name as "name!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!",
-            (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.drops > medic_stats.drops AND m2.drops > 100) + 1 AS "drops_rank!",
-            (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpu > medic_stats.dpu AND m2.drops > 100) + 1 AS "dpu_rank!",
-            (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dps > medic_stats.dps AND m2.drops > 100) + 1 AS "dps_rank!",
-            (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpg > medic_stats.dpg AND m2.drops > 100) + 1 AS "dpg_rank!"
-            FROM medic_stats
-            INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
-            WHERE medic_stats.steam_id=$1"#,
-            steam_id.steam3()
-        )
-            .fetch_one(&self.database)
-            .await?;
-
+        let result = self.player_cache.try_get_with(steam_id, async {
+            // for medics with more than 100 drops we have cached info
+            if let Ok(result) = sqlx::query_as!(
+                DropStats,
+                r#"SELECT steam_id as "steam_id!: _", name as "name!", games as "games!", ubers as "ubers!", drops as "drops!",
+                medic_time as "medic_time!", drops_rank as "drops_rank!", dpu_rank as "dpu_rank!", dps_rank as "dps_rank!", dpg_rank as "dpg_rank!"
+                FROM ranked_medic_stats
+                WHERE steam_id=$1"#,
+                steam_id.steam3()
+            )
+                .fetch_one(&self.database)
+                .await {
+                Ok(result)
+            } else {
+                // for other we need to recalculate
+                sqlx::query_as!(
+                    DropStats,
+                    r#"SELECT user_names.steam_id as "steam_id!: _", name as "name!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!",
+                    (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.drops > medic_stats.drops AND m2.drops > 100) + 1 AS "drops_rank!",
+                    (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpu > medic_stats.dpu AND m2.drops > 100) + 1 AS "dpu_rank!",
+                    (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dps > medic_stats.dps AND m2.drops > 100) + 1 AS "dps_rank!",
+                    (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpg > medic_stats.dpg AND m2.drops > 100) + 1 AS "dpg_rank!"
+                    FROM medic_stats
+                    INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
+                    WHERE medic_stats.steam_id=$1"#,
+                    steam_id.steam3()
+                )
+                    .fetch_one(&self.database)
+                    .await
+            }
+        }).await?;
         Ok(result)
     }
 
@@ -241,7 +248,7 @@ impl SearchResult {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DropStats {
     pub steam_id: SteamId,
     pub name: String,
