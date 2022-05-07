@@ -1,12 +1,12 @@
 {
   "db": "PostgreSQL",
-  "109b2cf4501771213784eaef1034168e5a9b55dabd876f7f52f269216518c98a": {
-    "query": "SELECT steam_id as \"steam_id!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                    FROM ranked_medic_stats\n                    ORDER BY dpg DESC LIMIT 25",
+  "02b8c8aab7ef9535b517e726fa14e0a9310c8c0df614e8c93c8f6c68de7c20f6": {
+    "query": "SELECT steam_id as \"steam_id!: _\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                        FROM ranked_medic_stats\n                        ORDER BY dpg DESC LIMIT 25",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "steam_id!",
+          "name": "steam_id!: _",
           "type_info": "Text"
         },
         {
@@ -48,13 +48,87 @@
       ]
     }
   },
-  "23fdd8c6fd2e4898b59ccf2cf81842de138dac4430cfcc18218c0c52b29c1c67": {
-    "query": "SELECT steam_id as \"steam_id!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                    FROM ranked_medic_stats\n                    ORDER BY dps DESC LIMIT 25",
+  "327fe513fdc60b8ec0e6a69253570bfd877a33a8b0444cdf5d0294753ea2be86": {
+    "query": "SELECT steam_id as \"steam_id!: _\", name as \"name!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\",\n                medic_time as \"medic_time!\", drops_rank as \"drops_rank!\", dpu_rank as \"dpu_rank!\", dps_rank as \"dps_rank!\", dpg_rank as \"dpg_rank!\"\n                FROM ranked_medic_stats\n                WHERE steam_id=$1",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "steam_id!",
+          "name": "steam_id!: _",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 1,
+          "name": "name!",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "games!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "ubers!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "drops!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "medic_time!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 6,
+          "name": "drops_rank!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 7,
+          "name": "dpu_rank!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 8,
+          "name": "dps_rank!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 9,
+          "name": "dpg_rank!",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  },
+  "518594b077c2867f1a1c079e468a5c18960271f26bff8c49df6897416d1be023": {
+    "query": "SELECT steam_id as \"steam_id!: _\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                        FROM ranked_medic_stats\n                        ORDER BY drops DESC LIMIT 25",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "steam_id!: _",
           "type_info": "Text"
         },
         {
@@ -96,13 +170,139 @@
       ]
     }
   },
-  "4691ef9c70e5f8f01cb1b7f1de02ed481048ea9c971f40ae49dee25da1e15422": {
-    "query": "SELECT user_names.steam_id as \"steam_id!\", name as \"name!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\",\n        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.drops > medic_stats.drops AND m2.drops > 100) + 1 AS \"drops_rank!\",\n        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpu > medic_stats.dpu AND m2.drops > 100) + 1 AS \"dpu_rank!\",\n        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dps > medic_stats.dps AND m2.drops > 100) + 1 AS \"dps_rank!\",\n        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpg > medic_stats.dpg AND m2.drops > 100) + 1 AS \"dpg_rank!\"\n        FROM medic_stats\n        INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id\n        WHERE medic_stats.steam_id=$1",
+  "57b871933ae9ce3a2a816ffdca7922fb9deaf383fd1b3844a872a7722486e5ee": {
+    "query": "SELECT steam_id as \"steam_id!: _\", name as \"name!\", count as \"count!\", (1 - (name  <-> $1)) AS \"sim!\" \n            FROM medic_names\n            WHERE name ~* $1\n            ORDER BY count DESC\n            LIMIT 50",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "steam_id!",
+          "name": "steam_id!: _",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 1,
+          "name": "name!",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "count!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "sim!",
+          "type_info": "Float8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        null
+      ]
+    }
+  },
+  "7006a89498e3e58cde9291dbb9b3c6e11b462da481a0349418588a54dcf95354": {
+    "query": "SELECT name FROM user_names WHERE steam_id=$1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "name",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        true
+      ]
+    }
+  },
+  "7ad21df124f5a72093867c019bb3b2072c19bdb4d76031770d786d1cf7b4e7e1": {
+    "query": "SELECT steam_id as \"steam_id!: SteamId\" FROM vanity_urls WHERE url=$1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "steam_id!: SteamId",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
+  "926a788dfd54490cce5e4c115271c75a0cfb3ecfc35dcd8a6915b09716673c13": {
+    "query": "SELECT steam_id as \"steam_id!: _\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                        FROM ranked_medic_stats\n                        ORDER BY dps DESC LIMIT 25",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "steam_id!: _",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 1,
+          "name": "games!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "ubers!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 3,
+          "name": "drops!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "medic_time!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "name!",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  },
+  "9c0ccef839612575cbd345197c29749b4297fff9617cb6ef6da1d60b69e217c7": {
+    "query": "SELECT user_names.steam_id as \"steam_id!: _\", name as \"name!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\",\n                    (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.drops > medic_stats.drops AND m2.drops > 100) + 1 AS \"drops_rank!\",\n                    (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpu > medic_stats.dpu AND m2.drops > 100) + 1 AS \"dpu_rank!\",\n                    (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dps > medic_stats.dps AND m2.drops > 100) + 1 AS \"dps_rank!\",\n                    (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpg > medic_stats.dpg AND m2.drops > 100) + 1 AS \"dpg_rank!\"\n                    FROM medic_stats\n                    INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id\n                    WHERE medic_stats.steam_id=$1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "steam_id!: _",
           "type_info": "Text"
         },
         {
@@ -167,216 +367,6 @@
         null,
         null,
         null
-      ]
-    }
-  },
-  "47a4b9822b11d4eda0f8d8ee8fa887374ecc6bc56e99096e77d2e1b3fc47624c": {
-    "query": "SELECT name\n        FROM user_names\n        WHERE steam_id=$1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "name",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        true
-      ]
-    }
-  },
-  "6ac6f586f743e77e551a3107476586bdefdf159d0c2b03aec070e5986743df0d": {
-    "query": "SELECT steam_id as \"steam_id!\", name as \"name!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\",\n        medic_time as \"medic_time!\", drops_rank as \"drops_rank!\", dpu_rank as \"dpu_rank!\", dps_rank as \"dps_rank!\", dpg_rank as \"dpg_rank!\"\n        FROM ranked_medic_stats\n        WHERE steam_id=$1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "steam_id!",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 1,
-          "name": "name!",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "games!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "ubers!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "drops!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "medic_time!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 6,
-          "name": "drops_rank!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 7,
-          "name": "dpu_rank!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 8,
-          "name": "dps_rank!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 9,
-          "name": "dpg_rank!",
-          "type_info": "Int8"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true,
-        true
-      ]
-    }
-  },
-  "92838e6703b1ec47d38657cc88505b0471acdd64e736efa34f210c7eb9733711": {
-    "query": "SELECT steam_id FROM vanity_urls WHERE url=$1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "steam_id",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        false
-      ]
-    }
-  },
-  "b50a9f62fe45569336fa66af0957fae4224558ceacc2039eac3454b7f4f554a9": {
-    "query": "SELECT steam_id as \"steam_id!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                    FROM ranked_medic_stats\n                    ORDER BY drops DESC LIMIT 25",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "steam_id!",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 1,
-          "name": "games!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "ubers!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "drops!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "medic_time!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "name!",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        true,
-        true,
-        true,
-        true,
-        true,
-        true
-      ]
-    }
-  },
-  "b80c5a13dfcc9d3b895705fa1068829e58de33d4ed872e89be0a498f84b77be7": {
-    "query": "SELECT steam_id as \"steam_id!\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                    FROM ranked_medic_stats\n                    ORDER BY dpu DESC LIMIT 25",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "steam_id!",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 1,
-          "name": "games!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "ubers!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "drops!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 4,
-          "name": "medic_time!",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "name!",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        true,
-        true,
-        true,
-        true,
-        true,
-        true
       ]
     }
   },
@@ -410,41 +400,51 @@
       ]
     }
   },
-  "e6a1149dbe7dcb5834fc60cc8c20843482d89d11f6aff59d2ba1799abd8cec84": {
-    "query": "SELECT steam_id as \"steam_id!\", name as \"name!\", count as \"count!\", (1 - (name  <-> $1)) AS \"sim!\" \n        FROM medic_names\n        WHERE name ~* $1\n        ORDER BY count DESC\n        LIMIT 50",
+  "eaf3118cbdb113017e13917735fd486dca97917c21371244542fedf320272cbc": {
+    "query": "SELECT steam_id as \"steam_id!: _\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                        FROM ranked_medic_stats\n                        ORDER BY dpu DESC LIMIT 25",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "steam_id!",
+          "name": "steam_id!: _",
           "type_info": "Text"
         },
         {
           "ordinal": 1,
-          "name": "name!",
-          "type_info": "Text"
+          "name": "games!",
+          "type_info": "Int8"
         },
         {
           "ordinal": 2,
-          "name": "count!",
+          "name": "ubers!",
           "type_info": "Int8"
         },
         {
           "ordinal": 3,
-          "name": "sim!",
-          "type_info": "Float8"
+          "name": "drops!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 4,
+          "name": "medic_time!",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 5,
+          "name": "name!",
+          "type_info": "Text"
         }
       ],
       "parameters": {
-        "Left": [
-          "Text"
-        ]
+        "Left": []
       },
       "nullable": [
         true,
         true,
         true,
-        null
+        true,
+        true,
+        true
       ]
     }
   },
