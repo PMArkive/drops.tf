@@ -9,7 +9,6 @@ use axum::{Extension, Json, Router};
 use main_error::MainError;
 use sqlx::postgres::PgPool;
 use std::borrow::Cow;
-use std::convert::TryInto;
 use std::fmt::Debug;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -22,6 +21,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 mod data;
+mod steamid;
 
 #[derive(Debug, Error)]
 pub enum DropsError {
@@ -102,7 +102,7 @@ async fn page_player(
     Extension(data_source): Extension<DataSource>,
     Path(steam_id): Path<String>,
 ) -> Result<impl IntoResponse, DropsError> {
-    let steam_id = match steam_id.as_str().try_into().map_err(DropsError::from) {
+    let steam_id = match steam_id.parse().map_err(DropsError::from) {
         Ok(steam_id) => steam_id,
         Err(e) => data_source.resolve_vanity_url(&steam_id).await?.ok_or(e)?,
     };

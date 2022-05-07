@@ -1,14 +1,13 @@
+use crate::steamid::SteamId;
 use crate::DropsError;
 use moka::future::Cache;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::collections::HashSet;
-use std::convert::TryInto;
 use std::fmt;
 use std::fmt::Display;
 use std::sync::Arc;
 use std::time::Duration;
-use steamid_ng::SteamID;
 use tracing::instrument;
 
 #[derive(Clone)]
@@ -37,10 +36,10 @@ impl DataSource {
 
     #[instrument(skip(self))]
     pub async fn player_search(&self, search: &str) -> Result<Vec<SearchResult>, DropsError> {
-        if let Ok(steam_id) = search.try_into() {
+        if let Ok(steam_id) = search.parse() {
             if let Some(name) = self.get_user_name(steam_id).await? {
                 return Ok(vec![SearchResult {
-                    steam_id: steam_id.steam3(),
+                    steam_id,
                     name,
                     count: 1,
                     sim: 1.0,
@@ -51,7 +50,7 @@ impl DataSource {
     }
 
     #[instrument(skip(self))]
-    async fn get_user_name(&self, steam_id: SteamID) -> Result<Option<String>, DropsError> {
+    async fn get_user_name(&self, steam_id: SteamId) -> Result<Option<String>, DropsError> {
         let result = sqlx::query!(
             r#"SELECT name FROM user_names WHERE steam_id=$1"#,
             steam_id.steam3()
@@ -65,14 +64,14 @@ impl DataSource {
     #[instrument(skip(self))]
     async fn player_wildcard_search(&self, search: &str) -> Result<Vec<SearchResult>, DropsError> {
         let mut players: Vec<SearchResult> = sqlx::query_as!(
-        SearchResult,
-        r#"SELECT steam_id as "steam_id!", name as "name!", count as "count!", (1 - (name  <-> $1)) AS "sim!" 
-        FROM medic_names
-        WHERE name ~* $1
-        ORDER BY count DESC
-        LIMIT 50"#,
-        search
-    )
+            SearchResult,
+            r#"SELECT steam_id as "steam_id!: _", name as "name!", count as "count!", (1 - (name  <-> $1)) AS "sim!" 
+            FROM medic_names
+            WHERE name ~* $1
+            ORDER BY count DESC
+            LIMIT 50"#,
+            search
+        )
             .fetch_all(&self.database)
             .await?;
 
@@ -94,11 +93,11 @@ impl DataSource {
     }
 
     #[instrument(skip(self))]
-    pub async fn stats_for_user(&self, steam_id: SteamID) -> Result<DropStats, DropsError> {
+    pub async fn stats_for_user(&self, steam_id: SteamId) -> Result<DropStats, DropsError> {
         // for medics with more than 100 drops we have cached info
         if let Ok(result) = sqlx::query_as!(
             DropStats,
-            r#"SELECT steam_id as "steam_id!", name as "name!", games as "games!", ubers as "ubers!", drops as "drops!",
+            r#"SELECT steam_id as "steam_id!: _", name as "name!", games as "games!", ubers as "ubers!", drops as "drops!",
             medic_time as "medic_time!", drops_rank as "drops_rank!", dpu_rank as "dpu_rank!", dps_rank as "dps_rank!", dpg_rank as "dpg_rank!"
             FROM ranked_medic_stats
             WHERE steam_id=$1"#,
@@ -112,7 +111,7 @@ impl DataSource {
         // for other we need to recalculate
         let result = sqlx::query_as!(
             DropStats,
-            r#"SELECT user_names.steam_id as "steam_id!", name as "name!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!",
+            r#"SELECT user_names.steam_id as "steam_id!: _", name as "name!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!",
             (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.drops > medic_stats.drops AND m2.drops > 100) + 1 AS "drops_rank!",
             (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpu > medic_stats.dpu AND m2.drops > 100) + 1 AS "dpu_rank!",
             (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dps > medic_stats.dps AND m2.drops > 100) + 1 AS "dps_rank!",
@@ -135,7 +134,7 @@ impl DataSource {
                 TopOrder::Drops => {
                     sqlx::query_as!(
                         TopStats,
-                        r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
+                        r#"SELECT steam_id as "steam_id!: _", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
                         FROM ranked_medic_stats
                         ORDER BY drops DESC LIMIT 25"#
                     )
@@ -145,7 +144,7 @@ impl DataSource {
                 TopOrder::Dps => {
                     sqlx::query_as!(
                         TopStats,
-                        r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
+                        r#"SELECT steam_id as "steam_id!: _", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
                         FROM ranked_medic_stats
                         ORDER BY dps DESC LIMIT 25"#
                     )
@@ -155,7 +154,7 @@ impl DataSource {
                 TopOrder::Dpu => {
                     sqlx::query_as!(
                         TopStats,
-                        r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
+                        r#"SELECT steam_id as "steam_id!: _", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
                         FROM ranked_medic_stats
                         ORDER BY dpu DESC LIMIT 25"#
                     )
@@ -165,7 +164,7 @@ impl DataSource {
                 TopOrder::Dpg => {
                     sqlx::query_as!(
                         TopStats,
-                        r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
+                        r#"SELECT steam_id as "steam_id!: _", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
                         FROM ranked_medic_stats
                         ORDER BY dpg DESC LIMIT 25"#
                     )
@@ -196,13 +195,15 @@ impl DataSource {
     }
 
     #[instrument(skip(self))]
-    pub async fn resolve_vanity_url(&self, url: &str) -> Result<Option<SteamID>, DropsError> {
-        if let Ok(row) = sqlx::query!(r#"SELECT steam_id FROM vanity_urls WHERE url=$1"#, url)
-            .fetch_one(&self.database)
-            .await
+    pub async fn resolve_vanity_url(&self, url: &str) -> Result<Option<SteamId>, DropsError> {
+        if let Ok(row) = sqlx::query!(
+            r#"SELECT steam_id as "steam_id!: SteamId" FROM vanity_urls WHERE url=$1"#,
+            url
+        )
+        .fetch_one(&self.database)
+        .await
         {
-            let steam_id: String = row.steam_id;
-            Ok(Some(SteamID::from_steam3(&steam_id)?))
+            Ok(Some(row.steam_id))
         } else if let Some(steam_id) =
             steam_resolve_vanity::resolve_vanity_url(url, &self.api_key).await?
         {
@@ -214,7 +215,7 @@ impl DataSource {
             .execute(&self.database)
             .await?;
 
-            Ok(Some(steam_id))
+            Ok(Some(SteamId::from(steam_id)))
         } else {
             Ok(None)
         }
@@ -228,7 +229,7 @@ pub struct SearchParams {
 
 #[derive(Debug, Serialize)]
 pub struct SearchResult {
-    pub steam_id: String,
+    pub steam_id: SteamId,
     pub name: String,
     pub count: i64,
     pub sim: f64,
@@ -242,7 +243,7 @@ impl SearchResult {
 
 #[derive(Debug)]
 pub struct DropStats {
-    pub steam_id: String,
+    pub steam_id: SteamId,
     pub name: String,
     pub drops: i64,
     pub ubers: i64,
@@ -271,47 +272,42 @@ impl DropStats {
     }
 
     pub fn steam_link(&self) -> String {
-        format!("https://steamcommunity.com/profiles/{}", self.steam_id)
-    }
-
-    pub fn etf2l_link(&self) -> String {
         format!(
-            "http://etf2l.org/search/{}",
-            &self.steam_id[1..self.steam_id.len() - 1]
+            "https://steamcommunity.com/profiles/{}",
+            u64::from(self.steam_id)
         )
     }
 
-    pub fn ugc_link(&self) -> String {
-        let steam_id_64 = u64::from(SteamID::from_steam3(&self.steam_id).unwrap());
+    pub fn etf2l_link(&self) -> String {
+        format!("http://etf2l.org/search/{}", u64::from(self.steam_id))
+    }
 
+    pub fn ugc_link(&self) -> String {
         format!(
             "https://www.ugcleague.com/players_page.cfm?player_id={}",
-            steam_id_64
+            u64::from(self.steam_id)
         )
     }
 
     pub fn logs_link(&self) -> String {
-        let steam_id_64 = u64::from(SteamID::from_steam3(&self.steam_id).unwrap());
-
-        format!("http://logs.tf/profile/{}", steam_id_64)
+        format!("http://logs.tf/profile/{}", u64::from(self.steam_id))
     }
 
     pub fn demos_link(&self) -> String {
-        let steam_id_64 = u64::from(SteamID::from_steam3(&self.steam_id).unwrap());
-
-        format!("http://demos.tf/profiles/{}", steam_id_64)
+        format!("http://demos.tf/profiles/{}", u64::from(self.steam_id))
     }
 
     pub fn rgl_link(&self) -> String {
-        let steam_id_64 = u64::from(SteamID::from_steam3(&self.steam_id).unwrap());
-
-        format!("https://rgl.gg/Public/PlayerProfile.aspx?p={}", steam_id_64)
+        format!(
+            "https://rgl.gg/Public/PlayerProfile.aspx?p={}",
+            u64::from(self.steam_id)
+        )
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct TopStats {
-    pub steam_id: String,
+    pub steam_id: SteamId,
     pub name: String,
     pub drops: i64,
     pub ubers: i64,
@@ -333,6 +329,10 @@ impl TopStats {
 
     pub fn dpg(&self) -> String {
         format!("{:.2}", self.drops as f64 / self.games as f64)
+    }
+
+    pub fn steam_id64(&self) -> u64 {
+        self.steam_id.into()
     }
 }
 
