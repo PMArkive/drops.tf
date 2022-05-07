@@ -114,6 +114,15 @@ async fn page_player(
         .stats_for_user(steam_id)
         .await
         .map_err(|_| DropsError::UserNotFound)?;
+
+    metrics::increment_counter!(
+        "player_stats",
+        &[
+            ("steam_id", format!("{}", u64::from(steam_id))),
+            ("name", stats.name.clone())
+        ]
+    );
+
     let template = PlayerTemplate { stats };
     Ok(Html(template.render()?))
 }
