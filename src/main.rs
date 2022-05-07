@@ -8,6 +8,7 @@ use axum::routing::get;
 use axum::{Extension, Json, Router};
 use main_error::MainError;
 use sqlx::postgres::PgPool;
+use std::borrow::Cow;
 use std::convert::TryInto;
 use std::fmt::Debug;
 use std::net::SocketAddr;
@@ -34,15 +35,25 @@ pub enum DropsError {
     Steam(#[from] steam_resolve_vanity::Error),
     #[error("Error while rendering template")]
     Template(#[from] askama::Error),
+    #[error("404 - Page not found")]
+    NotFound,
 }
 
 impl IntoResponse for DropsError {
     fn into_response(self) -> Response {
         let status = match &self {
             DropsError::SteamId(_) => StatusCode::BAD_REQUEST,
+            DropsError::NotFound => StatusCode::NOT_FOUND,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
-        (status, format!("{}", self)).into_response()
+        let template = ErrorTemplate {
+            error: Cow::Owned(format!("{}", self)),
+        };
+        (
+            status,
+            Html(template.render().unwrap_or("Error rendering error".into())),
+        )
+            .into_response()
     }
 }
 
@@ -60,12 +71,10 @@ struct PlayerTemplate {
 }
 
 #[derive(Template)]
-#[template(path = "notfound.html")]
-struct NotFoundTemplate;
-
-#[derive(Template)]
-#[template(path = "404.html")]
-struct PageNotFoundTemplate;
+#[template(path = "error.html")]
+struct ErrorTemplate {
+    error: Cow<'static, str>,
+}
 
 #[instrument(skip(data_source))]
 async fn page_top_stats(
@@ -94,7 +103,9 @@ async fn page_player(
     let stats = match data_source.stats_for_user(steam_id).await {
         Ok(stats) => stats,
         Err(_) => {
-            let template = NotFoundTemplate;
+            let template = ErrorTemplate {
+                error: Cow::Borrowed("User not found or no drops"),
+            };
             return Ok(Html(template.render()?));
         }
     };
@@ -112,8 +123,7 @@ pub async fn api_search(
 }
 
 async fn handler_404() -> impl IntoResponse {
-    let template = PageNotFoundTemplate;
-    (StatusCode::NOT_FOUND, Html(template.render().unwrap()))
+    DropsError::NotFound
 }
 
 #[tokio::main]
@@ -168,16 +178,11 @@ async fn main() -> Result<(), MainError> {
         .layer(TraceLayer::new_for_http())
         .fallback(handler_404.into_service());
 
-    // let not_found = warp::any().map(|| {
-    //     return Ok(warp::reply::html(PageNotFoundTemplate.render().unwrap()));
-    // });
-
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     tracing::debug!("listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
-        .await
-        .unwrap();
+        .await?;
 
     Ok(())
 }
