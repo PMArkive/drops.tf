@@ -23,6 +23,8 @@ moka = { version = "0.8.1", features = ["future"] }
 axum = "0.5.1"
 tower-http = { version = "0.2.5", features = ["trace"] }
 thiserror = "1.0.30"
+metrics-exporter-prometheus = "0.9.0"
+metrics = "0.18.1"
 
 [profile.release]
 lto = true

@@ -138,6 +138,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "atomic-shim"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67cd4b51d303cf3501c301e8125df442128d3c6d7c69f71b27833d253de47e77"
+dependencies = [
+ "crossbeam-utils 0.8.8",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -332,6 +341,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam-epoch"
+version = "0.9.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1145cf131a2c6ba0615079ab6a638f7e1973ac9c2634fcbeaaad6114246efe8c"
+dependencies = [
+ "autocfg",
+ "cfg-if 1.0.0",
+ "crossbeam-utils 0.8.8",
+ "lazy_static",
+ "memoffset 0.6.5",
+ "scopeguard",
+]
+
+[[package]]
 name = "crossbeam-queue"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -417,6 +440,8 @@ dependencies = [
  "axum",
  "dotenv",
  "main_error",
+ "metrics",
+ "metrics-exporter-prometheus",
  "moka",
  "opentelemetry",
  "opentelemetry-jaeger",
@@ -959,6 +984,62 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics"
+version = "0.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e52eb6380b6d2a10eb3434aec0885374490f5b82c8aaf5cd487a183c98be834"
+dependencies = [
+ "ahash",
+ "metrics-macros",
+]
+
+[[package]]
+name = "metrics-exporter-prometheus"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b93b470b04c005178058e18ac8bb2eb3fda562cf87af5ea05ba8d44190d458c"
+dependencies = [
+ "hyper",
+ "indexmap",
+ "ipnet",
+ "metrics",
+ "metrics-util",
+ "parking_lot 0.11.2",
+ "quanta",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "metrics-macros"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49e30813093f757be5cf21e50389a24dc7dbb22c49f23b7e8f51d69b508a5ffa"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "metrics-util"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65a9e83b833e1d2e07010a386b197c13aa199bbd0fca5cf69bfa147972db890a"
+dependencies = [
+ "atomic-shim",
+ "crossbeam-epoch 0.9.8",
+ "crossbeam-utils 0.8.8",
+ "hashbrown",
+ "metrics",
+ "num_cpus",
+ "parking_lot 0.11.2",
+ "quanta",
+ "sketches-ddsketch",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1012,7 +1093,7 @@ dependencies = [
  "async-io",
  "async-lock",
  "crossbeam-channel",
- "crossbeam-epoch",
+ "crossbeam-epoch 0.8.2",
  "crossbeam-utils 0.8.8",
  "futures-util",
  "num_cpus",
@@ -1698,6 +1779,12 @@ dependencies = [
  "tempfile",
  "walkdir",
 ]
+
+[[package]]
+name = "sketches-ddsketch"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76a77a8fd93886010f05e7ea0720e569d6d16c65329dbe3ec033bbbccccb017b"
 
 [[package]]
 name = "slab"

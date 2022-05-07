@@ -1,19 +1,23 @@
 use crate::data::{DataSource, DropStats, GlobalStats, SearchParams, TopOrder, TopStats};
 use askama::Template;
-use axum::extract::{Path, Query};
+use axum::extract::{MatchedPath, Path, Query};
 use axum::handler::Handler;
-use axum::http::StatusCode;
+use axum::http::{Request, StatusCode};
+use axum::middleware::Next;
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get;
-use axum::{Extension, Json, Router};
+use axum::{middleware, Extension, Json, Router};
 use main_error::MainError;
+use metrics_exporter_prometheus::{Matcher, PrometheusBuilder, PrometheusHandle};
 use sqlx::postgres::PgPool;
 use std::borrow::Cow;
 use std::fmt::Debug;
+use std::future::ready;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
+use tokio::time::Instant;
 use tower_http::trace::TraceLayer;
 use tracing::instrument;
 use tracing_subscriber::layer::SubscriberExt;
@@ -156,6 +160,8 @@ async fn main() -> Result<(), MainError> {
     let pool = PgPool::connect(&database_url).await?;
     let data_source = DataSource::new(pool, api_key);
 
+    let recorder_handle = setup_metrics_recorder();
+
     let app = Router::new()
         .route(
             "/",
@@ -175,6 +181,8 @@ async fn main() -> Result<(), MainError> {
         )
         .route("/profile/:steam_id", get(page_player))
         .route("/search", get(api_search))
+        .route("/metrics", get(move || ready(recorder_handle.render())))
+        .route_layer(middleware::from_fn(track_metrics))
         .layer(Extension(data_source))
         .layer(TraceLayer::new_for_http())
         .fallback(handler_404.into_service());
@@ -186,4 +194,47 @@ async fn main() -> Result<(), MainError> {
         .await?;
 
     Ok(())
+}
+
+fn setup_metrics_recorder() -> PrometheusHandle {
+    const EXPONENTIAL_SECONDS: &[f64] = &[
+        0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
+    ];
+
+    PrometheusBuilder::new()
+        .set_buckets_for_metric(
+            Matcher::Full("http_requests_duration_seconds".to_string()),
+            EXPONENTIAL_SECONDS,
+        )
+        .unwrap()
+        .install_recorder()
+        .unwrap()
+}
+
+async fn track_metrics<B>(req: Request<B>, next: Next<B>) -> impl IntoResponse {
+    let start = Instant::now();
+    let path = if let Some(matched_path) = req.extensions().get::<MatchedPath>() {
+        matched_path.as_str().to_owned()
+    } else {
+        req.uri().path().to_owned()
+    };
+    let method = req.method().clone();
+
+    let response = next.run(req).await;
+
+    let latency = start.elapsed().as_secs_f64();
+    let status = response.status().as_u16().to_string();
+
+    if path != "/metrics" {
+        let labels = [
+            ("method", method.to_string()),
+            ("path", path),
+            ("status", status),
+        ];
+
+        metrics::increment_counter!("http_requests_total", &labels);
+        metrics::histogram!("http_requests_duration_seconds", latency, &labels);
+    }
+
+    response
 }
