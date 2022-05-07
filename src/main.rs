@@ -19,7 +19,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::time::Instant;
 use tower_http::trace::TraceLayer;
-use tracing::instrument;
+use tracing::{error, instrument};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
@@ -108,12 +108,19 @@ async fn page_player(
 ) -> Result<impl IntoResponse, DropsError> {
     let steam_id = match steam_id.parse().map_err(DropsError::from) {
         Ok(steam_id) => steam_id,
-        Err(e) => data_source.resolve_vanity_url(&steam_id).await?.ok_or(e)?,
+        Err(e) => data_source
+            .resolve_vanity_url(&steam_id)
+            .await?
+            .ok_or(e)
+            .map_err(|e| {
+                error!(steam_id = display(steam_id), "user not found");
+                e
+            })?,
     };
-    let stats = data_source
-        .stats_for_user(steam_id)
-        .await
-        .map_err(|_| DropsError::UserNotFound)?;
+    let stats = data_source.stats_for_user(steam_id).await.map_err(|_| {
+        error!(steam_id = u64::from(steam_id), "no logs found for user");
+        DropsError::UserNotFound
+    })?;
 
     metrics::increment_counter!(
         "player_stats",
