@@ -25,6 +25,13 @@
         text-align: right;
     }
 
+    td.rank, th.rank {
+        width: 40px;
+        text-align: right;
+        opacity: 0.5;
+        padding-right: 5px;
+    }
+
     th {
         text-align: left;
     }
@@ -74,6 +81,10 @@
             width: 65px;
             padding-right: 3px;
         }
+
+        td.rank, th.rank {
+            display: none;
+        }
     }
 </style>
 {% endblock %}
@@ -92,6 +103,7 @@
 <table class="leaderboards">
     <thead>
     <tr>
+        <th class="rank"></th>
         <th>Name</th>
         <th class="stat"><a href="/">Drops</a></th>
         <th class="stat"><a href="/dpu">per uber</a></th>
@@ -102,6 +114,9 @@
     {% for medic in top %}
     <tbody>
     <tr>
+        <td class="rank">
+            #{{ loop.index }}
+        </td>
         <td>
             <a href="/profile/{{ medic.steam_id64() }}">{{ medic.name }}</a>
         </td>
