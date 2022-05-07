@@ -37,6 +37,8 @@ pub enum DropsError {
     Template(#[from] askama::Error),
     #[error("404 - Page not found")]
     NotFound,
+    #[error("User not found or no drops")]
+    UserNotFound,
 }
 
 impl IntoResponse for DropsError {
@@ -51,7 +53,11 @@ impl IntoResponse for DropsError {
         };
         (
             status,
-            Html(template.render().unwrap_or("Error rendering error".into())),
+            Html(
+                template
+                    .render()
+                    .unwrap_or_else(|_| "Error rendering error".into()),
+            ),
         )
             .into_response()
     }
@@ -100,15 +106,10 @@ async fn page_player(
         Ok(steam_id) => steam_id,
         Err(e) => data_source.resolve_vanity_url(&steam_id).await?.ok_or(e)?,
     };
-    let stats = match data_source.stats_for_user(steam_id).await {
-        Ok(stats) => stats,
-        Err(_) => {
-            let template = ErrorTemplate {
-                error: Cow::Borrowed("User not found or no drops"),
-            };
-            return Ok(Html(template.render()?));
-        }
-    };
+    let stats = data_source
+        .stats_for_user(steam_id)
+        .await
+        .map_err(|_| DropsError::UserNotFound)?;
     let template = PlayerTemplate { stats };
     Ok(Html(template.render()?))
 }

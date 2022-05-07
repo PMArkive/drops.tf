@@ -203,22 +203,20 @@ impl DataSource {
         {
             let steam_id: String = row.steam_id;
             Ok(Some(SteamID::from_steam3(&steam_id)?))
-        } else {
-            if let Some(steam_id) =
-                steam_resolve_vanity::resolve_vanity_url(url, &self.api_key).await?
-            {
-                sqlx::query!(
-                    r#"INSERT INTO vanity_urls(url, steam_id) VALUES($1, $2)"#,
-                    url,
-                    steam_id.steam3()
-                )
-                .execute(&self.database)
-                .await?;
+        } else if let Some(steam_id) =
+            steam_resolve_vanity::resolve_vanity_url(url, &self.api_key).await?
+        {
+            sqlx::query!(
+                r#"INSERT INTO vanity_urls(url, steam_id) VALUES($1, $2)"#,
+                url,
+                steam_id.steam3()
+            )
+            .execute(&self.database)
+            .await?;
 
-                Ok(Some(steam_id))
-            } else {
-                Ok(None)
-            }
+            Ok(Some(steam_id))
+        } else {
+            Ok(None)
         }
     }
 }
