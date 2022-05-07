@@ -36,20 +36,6 @@ impl DataSource {
     }
 
     #[instrument(skip(self))]
-    pub async fn get_user_name(&self, steam_id: SteamID) -> Result<Option<String>, DropsError> {
-        let result = sqlx::query!(
-            r#"SELECT name
-        FROM user_names
-        WHERE steam_id=$1"#,
-            steam_id.steam3()
-        )
-        .fetch_one(&self.database)
-        .await?;
-
-        Ok(result.name)
-    }
-
-    #[instrument(skip(self))]
     pub async fn player_search(&self, search: &str) -> Result<Vec<SearchResult>, DropsError> {
         if let Ok(steam_id) = search.try_into() {
             if let Some(name) = self.get_user_name(steam_id).await? {
@@ -62,6 +48,18 @@ impl DataSource {
             }
         }
         self.player_wildcard_search(search).await
+    }
+
+    #[instrument(skip(self))]
+    async fn get_user_name(&self, steam_id: SteamID) -> Result<Option<String>, DropsError> {
+        let result = sqlx::query!(
+            r#"SELECT name FROM user_names WHERE steam_id=$1"#,
+            steam_id.steam3()
+        )
+        .fetch_one(&self.database)
+        .await?;
+
+        Ok(result.name)
     }
 
     #[instrument(skip(self))]
@@ -99,13 +97,13 @@ impl DataSource {
     pub async fn stats_for_user(&self, steam_id: SteamID) -> Result<DropStats, DropsError> {
         // for medics with more than 100 drops we have cached info
         if let Ok(result) = sqlx::query_as!(
-        DropStats,
-        r#"SELECT steam_id as "steam_id!", name as "name!", games as "games!", ubers as "ubers!", drops as "drops!",
-        medic_time as "medic_time!", drops_rank as "drops_rank!", dpu_rank as "dpu_rank!", dps_rank as "dps_rank!", dpg_rank as "dpg_rank!"
-        FROM ranked_medic_stats
-        WHERE steam_id=$1"#,
-        steam_id.steam3()
-    )
+            DropStats,
+            r#"SELECT steam_id as "steam_id!", name as "name!", games as "games!", ubers as "ubers!", drops as "drops!",
+            medic_time as "medic_time!", drops_rank as "drops_rank!", dpu_rank as "dpu_rank!", dps_rank as "dps_rank!", dpg_rank as "dpg_rank!"
+            FROM ranked_medic_stats
+            WHERE steam_id=$1"#,
+            steam_id.steam3()
+        )
             .fetch_one(&self.database)
             .await {
             return Ok(result);
@@ -113,17 +111,17 @@ impl DataSource {
 
         // for other we need to recalculate
         let result = sqlx::query_as!(
-        DropStats,
-        r#"SELECT user_names.steam_id as "steam_id!", name as "name!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!",
-        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.drops > medic_stats.drops AND m2.drops > 100) + 1 AS "drops_rank!",
-        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpu > medic_stats.dpu AND m2.drops > 100) + 1 AS "dpu_rank!",
-        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dps > medic_stats.dps AND m2.drops > 100) + 1 AS "dps_rank!",
-        (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpg > medic_stats.dpg AND m2.drops > 100) + 1 AS "dpg_rank!"
-        FROM medic_stats
-        INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
-        WHERE medic_stats.steam_id=$1"#,
-        steam_id.steam3()
-    )
+            DropStats,
+            r#"SELECT user_names.steam_id as "steam_id!", name as "name!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!",
+            (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.drops > medic_stats.drops AND m2.drops > 100) + 1 AS "drops_rank!",
+            (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpu > medic_stats.dpu AND m2.drops > 100) + 1 AS "dpu_rank!",
+            (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dps > medic_stats.dps AND m2.drops > 100) + 1 AS "dps_rank!",
+            (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpg > medic_stats.dpg AND m2.drops > 100) + 1 AS "dpg_rank!"
+            FROM medic_stats
+            INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id
+            WHERE medic_stats.steam_id=$1"#,
+            steam_id.steam3()
+        )
             .fetch_one(&self.database)
             .await?;
 
@@ -136,41 +134,41 @@ impl DataSource {
             let result = match order {
                 TopOrder::Drops => {
                     sqlx::query_as!(
-                    TopStats,
-                    r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
-                    FROM ranked_medic_stats
-                    ORDER BY drops DESC LIMIT 25"#
-                )
+                        TopStats,
+                        r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
+                        FROM ranked_medic_stats
+                        ORDER BY drops DESC LIMIT 25"#
+                    )
                         .fetch_all(&self.database)
                         .await?
                 }
                 TopOrder::Dps => {
                     sqlx::query_as!(
-                    TopStats,
-                    r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
-                    FROM ranked_medic_stats
-                    ORDER BY dps DESC LIMIT 25"#
-                )
+                        TopStats,
+                        r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
+                        FROM ranked_medic_stats
+                        ORDER BY dps DESC LIMIT 25"#
+                    )
                         .fetch_all(&self.database)
                         .await?
                 }
                 TopOrder::Dpu => {
                     sqlx::query_as!(
-                    TopStats,
-                    r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
-                    FROM ranked_medic_stats
-                    ORDER BY dpu DESC LIMIT 25"#
-                )
+                        TopStats,
+                        r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
+                        FROM ranked_medic_stats
+                        ORDER BY dpu DESC LIMIT 25"#
+                    )
                         .fetch_all(&self.database)
                         .await?
                 }
                 TopOrder::Dpg => {
                     sqlx::query_as!(
-                    TopStats,
-                    r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
-                    FROM ranked_medic_stats
-                    ORDER BY dpg DESC LIMIT 25"#
-                )
+                        TopStats,
+                        r#"SELECT steam_id as "steam_id!", games as "games!", ubers as "ubers!", drops as "drops!", medic_time as "medic_time!", name as "name!"
+                        FROM ranked_medic_stats
+                        ORDER BY dpg DESC LIMIT 25"#
+                    )
                         .fetch_all(&self.database)
                         .await?
                 }
@@ -187,9 +185,9 @@ impl DataSource {
             .try_get_with(
                 (),
                 sqlx::query_as!(
-                GlobalStats,
-                r#"SELECT drops as "drops!", ubers as "ubers!", games as "games!" FROM global_stats"#
-            )
+                        GlobalStats,
+                        r#"SELECT drops as "drops!", ubers as "ubers!", games as "games!" FROM global_stats"#
+                    )
                     .fetch_one(&self.database),
             )
             .await?;
