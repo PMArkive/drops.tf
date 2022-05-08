@@ -102,13 +102,13 @@
     {{ stats.drops }} ubers dropped <span class="rank">#{{ stats.drops_rank }}</span>.
 </p>
 <p class="sub-drops">
-    {{ stats.dpg() }} drops per game <span class="rank">#{{ stats.dpg_rank }}</span>.
+    {{ "{:.2}"|format(stats.dpg()) }} drops per game <span class="rank">#{{ stats.dpg_rank }}</span>.
 </p>
 <p class="sub-drops">
-    {{ stats.dpm() }} drops per hour <span class="rank">#{{ stats.dps_rank }}</span>.
+    {{ "{:.2}"|format(stats.dpm()) }} drops per hour <span class="rank">#{{ stats.dps_rank }}</span>.
 </p>
 <p class="sub-drops">
-    {{ stats.dpu() }} drops per uber <span class="rank">#{{ stats.dpu_rank }}</span>.
+    {{ "{:.2}"|format(stats.dpu()) }} drops per uber <span class="rank">#{{ stats.dpu_rank }}</span>.
 </p>
 {% endblock %}
 

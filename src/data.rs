@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::collections::HashSet;
 use std::fmt;
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::instrument;
@@ -263,52 +263,40 @@ pub struct DropStats {
 }
 
 impl DropStats {
-    pub fn dpm(&self) -> String {
-        format!(
-            "{:.2}",
-            self.drops as f64 / (self.medic_time as f64 / 3600.0)
-        )
+    pub fn dpm(&self) -> f64 {
+        self.drops as f64 / (self.medic_time as f64 / 3600.0)
     }
 
-    pub fn dpu(&self) -> String {
-        format!("{:.2}", self.drops as f64 / self.ubers as f64)
+    pub fn dpu(&self) -> f64 {
+        self.drops as f64 / self.ubers as f64
     }
 
-    pub fn dpg(&self) -> String {
-        format!("{:.2}", self.drops as f64 / self.games as f64)
+    pub fn dpg(&self) -> f64 {
+        self.drops as f64 / self.games as f64
     }
 
-    pub fn steam_link(&self) -> String {
-        format!(
-            "https://steamcommunity.com/profiles/{}",
-            u64::from(self.steam_id)
-        )
+    pub fn steam_link<'a>(&'a self) -> impl Display + 'a {
+        PlayerLink::Steam(self.steam_id)
     }
 
-    pub fn etf2l_link(&self) -> String {
-        format!("https://etf2l.org/search/{}", u64::from(self.steam_id))
+    pub fn etf2l_link(&self) -> impl Display {
+        PlayerLink::Etf2l(self.steam_id)
     }
 
-    pub fn ugc_link(&self) -> String {
-        format!(
-            "https://www.ugcleague.com/players_page.cfm?player_id={}",
-            u64::from(self.steam_id)
-        )
+    pub fn ugc_link(&self) -> impl Display {
+        PlayerLink::Ugc(self.steam_id)
     }
 
-    pub fn logs_link(&self) -> String {
-        format!("https://logs.tf/profile/{}", u64::from(self.steam_id))
+    pub fn logs_link(&self) -> impl Display {
+        PlayerLink::Logs(self.steam_id)
     }
 
-    pub fn demos_link(&self) -> String {
-        format!("https://demos.tf/profiles/{}", u64::from(self.steam_id))
+    pub fn demos_link(&self) -> impl Display {
+        PlayerLink::Demos(self.steam_id)
     }
 
-    pub fn rgl_link(&self) -> String {
-        format!(
-            "https://rgl.gg/Public/PlayerProfile.aspx?p={}",
-            u64::from(self.steam_id)
-        )
+    pub fn rgl_link(&self) -> impl Display {
+        PlayerLink::Rgl(self.steam_id)
     }
 }
 
@@ -323,19 +311,16 @@ pub struct TopStats {
 }
 
 impl TopStats {
-    pub fn dpm(&self) -> String {
-        format!(
-            "{:.2}",
-            self.drops as f64 / (self.medic_time as f64 / 3600.0)
-        )
+    pub fn dpm(&self) -> f64 {
+        self.drops as f64 / (self.medic_time as f64 / 3600.0)
     }
 
-    pub fn dpu(&self) -> String {
-        format!("{:.2}", self.drops as f64 / self.ubers as f64)
+    pub fn dpu(&self) -> f64 {
+        self.drops as f64 / self.ubers as f64
     }
 
-    pub fn dpg(&self) -> String {
-        format!("{:.2}", self.drops as f64 / self.games as f64)
+    pub fn dpg(&self) -> f64 {
+        self.drops as f64 / self.games as f64
     }
 
     pub fn steam_id64(&self) -> u64 {
@@ -370,5 +355,47 @@ impl Display for TopOrder {
                 TopOrder::Dpu => "dpu",
             }
         )
+    }
+}
+
+pub enum PlayerLink {
+    Steam(SteamId),
+    Etf2l(SteamId),
+    Ugc(SteamId),
+    Logs(SteamId),
+    Demos(SteamId),
+    Rgl(SteamId),
+}
+
+impl PlayerLink {
+    fn steam_id64(&self) -> u64 {
+        match self {
+            PlayerLink::Steam(steam_id)
+            | PlayerLink::Etf2l(steam_id)
+            | PlayerLink::Ugc(steam_id)
+            | PlayerLink::Logs(steam_id)
+            | PlayerLink::Demos(steam_id)
+            | PlayerLink::Rgl(steam_id) => (*steam_id).into(),
+        }
+    }
+}
+
+impl Display for PlayerLink {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let id = self.steam_id64();
+        match self {
+            PlayerLink::Steam(_) => write!(f, "https://steamcommunity.com/profiles/{}", id),
+            PlayerLink::Etf2l(_) => write!(f, "https://etf2l.org/search/{}", id),
+            PlayerLink::Ugc(_) => write!(
+                f,
+                "https://www.ugcleague.com/players_page.cfm?player_id={}",
+                id
+            ),
+            PlayerLink::Logs(_) => write!(f, "https://logs.tf/profile/{}", id),
+            PlayerLink::Demos(_) => write!(f, "https://demos.tf/profiles/{}", id),
+            PlayerLink::Rgl(_) => {
+                write!(f, "https://rgl.gg/Public/PlayerProfile.aspx?p={}", id)
+            }
+        }
     }
 }

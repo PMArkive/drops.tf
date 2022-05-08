@@ -124,13 +124,13 @@
             {{ medic.drops }}
         </td>
         <td class="stat">
-            {{ medic.dpu() }}
+            {{ "{:.2}"|format(medic.dpu()) }}
         </td>
         <td class="stat">
-            {{ medic.dpg() }}
+            {{ "{:.2}"|format(medic.dpg()) }}
         </td>
         <td class="stat">
-            {{ medic.dpm() }}
+            {{ "{:.2}"|format(medic.dpm()) }}
         </td>
     </tr>
     </tbody>
