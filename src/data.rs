@@ -286,7 +286,7 @@ impl DropStats {
     }
 
     pub fn etf2l_link(&self) -> String {
-        format!("http://etf2l.org/search/{}", u64::from(self.steam_id))
+        format!("https://etf2l.org/search/{}", u64::from(self.steam_id))
     }
 
     pub fn ugc_link(&self) -> String {
@@ -297,11 +297,11 @@ impl DropStats {
     }
 
     pub fn logs_link(&self) -> String {
-        format!("http://logs.tf/profile/{}", u64::from(self.steam_id))
+        format!("https://logs.tf/profile/{}", u64::from(self.steam_id))
     }
 
     pub fn demos_link(&self) -> String {
-        format!("http://demos.tf/profiles/{}", u64::from(self.steam_id))
+        format!("https://demos.tf/profiles/{}", u64::from(self.steam_id))
     }
 
     pub fn rgl_link(&self) -> String {
