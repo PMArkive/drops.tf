@@ -25,7 +25,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 mod data;
-mod steamid;
+mod steam_id;
 
 #[derive(Debug, Error)]
 pub enum DropsError {

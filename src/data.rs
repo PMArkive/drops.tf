@@ -1,4 +1,4 @@
-use crate::steamid::SteamId;
+use crate::steam_id::SteamId;
 use crate::DropsError;
 use moka::future::Cache;
 use serde::{Deserialize, Serialize};
