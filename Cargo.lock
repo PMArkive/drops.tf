@@ -439,6 +439,7 @@ dependencies = [
  "askama",
  "axum",
  "dotenv",
+ "iai",
  "main_error",
  "metrics",
  "metrics-exporter-prometheus",
@@ -810,6 +811,12 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.23.4",
 ]
+
+[[package]]
+name = "iai"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71a816c97c42258aa5834d07590b718b4c9a598944cd39a52dc25b351185d678"
 
 [[package]]
 name = "idna"

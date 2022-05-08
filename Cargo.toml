@@ -28,3 +28,10 @@ metrics = "0.18.1"
 
 [profile.release]
 lto = true
+
+[dev-dependencies]
+iai = "0.1.1"
+
+[[bench]]
+name = "template"
+harness = false
