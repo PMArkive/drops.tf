@@ -90,12 +90,12 @@
         <a href="#" id="namelink">{{ stats.name }}</a>
     </p>
     <ul class="dropdown hidden" id="dropdown">
-        <li><a href="{{ stats.steam_link() }}">Steam</a></li>
-        <li><a href="{{ stats.etf2l_link() }}">ETF2L</a></li>
-        <li><a href="{{ stats.ugc_link() }}">UGC</a></li>
-        <li><a href="{{ stats.rgl_link() }}">RGL</a></li>
-        <li><a href="{{ stats.logs_link() }}">Logs</a></li>
-        <li><a href="{{ stats.demos_link() }}">Demos</a></li>
+        <li><a href="https://steamcommunity.com/profiles/{{ stats.steam_id64() }}">Steam</a></li>
+        <li><a href="https://etf2l.org/search/{{ stats.steam_id64() }}">ETF2L</a></li>
+        <li><a href="https://www.ugcleague.com/players_page.cfm?player_id={{ stats.steam_id64() }}">UGC</a></li>
+        <li><a href="https://logs.tf/profile/{{ stats.steam_id64() }}">RGL</a></li>
+        <li><a href="https://demos.tf/profiles/{{ stats.steam_id64() }}">Logs</a></li>
+        <li><a href="https://rgl.gg/Public/PlayerProfile.aspx?p={{ stats.steam_id64() }}">Demos</a></li>
     </ul>
 </div>
 <p class="drops">

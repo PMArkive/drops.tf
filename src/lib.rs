@@ -12,6 +12,7 @@ use tracing::{error, instrument};
 
 mod data;
 mod steam_id;
+mod str;
 
 #[derive(Debug, Error)]
 pub enum DropsError {
@@ -112,7 +113,7 @@ pub async fn page_player(
         "player_stats",
         &[
             ("steam_id", format!("{}", u64::from(steam_id))),
-            ("name", stats.name.clone())
+            ("name", stats.name.to_string())
         ]
     );
 
