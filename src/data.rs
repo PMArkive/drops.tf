@@ -88,11 +88,11 @@ impl DataSource {
         Ok(players
             .into_iter()
             .filter(|player| {
-                if !found.contains(&player.steam_id) {
-                    found.insert(player.steam_id.clone());
-                    true
-                } else {
+                if found.contains(&player.steam_id) {
                     false
+                } else {
+                    found.insert(player.steam_id);
+                    true
                 }
             })
             .collect())
@@ -244,7 +244,7 @@ pub struct SearchResult {
 
 impl SearchResult {
     pub fn weight(&self) -> f64 {
-        self.sim * 5.0 + self.count as f64 * 1.0
+        self.sim * 5.0 + self.count as f64
     }
 }
 

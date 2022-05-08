@@ -49,8 +49,7 @@ impl IntoResponse for DropsError {
     fn into_response(self) -> Response {
         let status = match &self {
             DropsError::SteamId(_) => StatusCode::BAD_REQUEST,
-            DropsError::NotFound => StatusCode::NOT_FOUND,
-            DropsError::UserNotFound => StatusCode::NOT_FOUND,
+            DropsError::NotFound | DropsError::UserNotFound => StatusCode::NOT_FOUND,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
         let template = ErrorTemplate {
