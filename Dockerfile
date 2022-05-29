@@ -1,6 +1,7 @@
 FROM ekidd/rust-musl-builder AS build
 
 COPY Cargo.toml Cargo.lock ./
+COPY benches ./benches/
 
 # Build with a dummy main to pre-build dependencies
 RUN mkdir src && \
