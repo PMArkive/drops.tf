@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use sqlx::database::HasValueRef;
 use sqlx::error::BoxDynError;
 use sqlx::{Database, Decode, Type};
@@ -7,13 +7,26 @@ use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
 use steamid_ng::SteamID;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Default, Serialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[repr(transparent)]
 pub struct SteamId(u64);
 
 impl SteamId {
     pub const fn new(id: u64) -> SteamId {
         SteamId(id)
+    }
+
+    pub fn steam3(&self) -> String {
+        SteamID::from(self.0).steam3()
+    }
+
+    pub fn steam2(&self) -> String {
+        SteamID::from(self.0).steam2()
+    }
+
+    pub fn from_steam3(s: &str) -> Result<Self, steamid_ng::SteamIDError> {
+        let id = SteamID::from_steam3(s)?;
+        Ok(SteamId(id.into()))
     }
 }
 
@@ -23,13 +36,12 @@ impl Debug for SteamId {
     }
 }
 
-impl SteamId {
-    pub fn steam3(&self) -> String {
-        SteamID::from(self.0).steam3()
-    }
-
-    pub fn steam2(&self) -> String {
-        SteamID::from(self.0).steam2()
+impl Serialize for SteamId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.collect_str(&self.0)
     }
 }
 
@@ -81,6 +93,6 @@ where
 {
     fn decode(value: <DB as HasValueRef<'r>>::ValueRef) -> Result<Self, BoxDynError> {
         let str = <&str as Decode<DB>>::decode(value)?;
-        Ok(str.parse()?)
+        Ok(Self::from_steam3(str)?)
     }
 }
