@@ -64,6 +64,12 @@
               default = 80;
               description = "port to listen on";
             };
+
+            enableUnixSocket = mkOption {
+              type = types.bool;
+              default = false;
+              description = "listen to a unix socket instead of TCP";
+            };
           };
 
           config = mkIf cfg.enable {
@@ -72,7 +78,9 @@
             in {
               wantedBy = ["multi-user.target"];
               script = "${pkg}/bin/dropstf";
-              environment = {
+              environment = if cfg.enableUnixSocket then {
+                SOCKET = "/run/dropstf/drops.sock";
+              } else {
                 PORT = toString cfg.port;
               };
 
@@ -96,13 +104,16 @@
                 ProtectHostname = true;
                 LockPersonality = true;
                 ProtectKernelTunables = true;
-                RestrictAddressFamilies = "AF_INET AF_INET6 AF_UNIX";
+                RestrictAddressFamilies = if cfg.enableUnixSocket then "AF_UNIX" else "AF_INET AF_INET6 AF_UNIX";
+                IPAddressDeny = if cfg.enableUnixSocket then "any" else "multicast";
+                PrivateNetwork = cfg.enableUnixSocket;
                 RestrictRealtime = true;
-                ProtectProc = "noaccess";
+                ProtectProc = "invisible";
                 SystemCallFilter = ["@system-service" "~@resources" "~@privileged"];
-                IPAddressDeny = "multicast";
                 PrivateUsers = true;
                 ProcSubset = "pid";
+                RuntimeDirectory = "dropstf";
+                RestrictSUIDSGID = true;
               };
             };
           };

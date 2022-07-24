@@ -26,6 +26,7 @@ thiserror = "1.0.31"
 metrics-exporter-prometheus = "0.10.0"
 metrics = "0.19.0"
 smol_str = "0.1.23"
+hyperlocal = "0.8.0"
 
 [profile.release]
 lto = true

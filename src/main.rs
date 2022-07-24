@@ -6,17 +6,26 @@ use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{middleware, Extension, Router};
 use dropstf::{api_search, handler_404, page_player, page_top_stats, DataSource, TopOrder};
+use hyperlocal::UnixServerExt;
 use main_error::MainError;
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder, PrometheusHandle};
 use sqlx::postgres::PgPool;
+use std::fs::{set_permissions, Permissions};
 use std::future::ready;
 use std::net::SocketAddr;
+use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
 use std::str::FromStr;
 use tokio::time::Instant;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
+
+enum Listen {
+    Port(u16),
+    Socket(String),
+}
 
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
@@ -42,7 +51,10 @@ async fn main() -> Result<(), MainError> {
 
     let database_url = dotenv::var("DATABASE_URL")?;
     let api_key = dotenv::var("STEAM_API_KEY")?;
-    let port = u16::from_str(&dotenv::var("PORT")?)?;
+    let listen = match dotenv::var("SOCKET") {
+        Ok(socket) => Listen::Socket(socket),
+        _ => Listen::Port(u16::from_str(&dotenv::var("PORT")?)?),
+    };
 
     let pool = PgPool::connect(&database_url).await?;
     let data_source = DataSource::new(pool, api_key);
@@ -74,11 +86,26 @@ async fn main() -> Result<(), MainError> {
         .layer(TraceLayer::new_for_http())
         .fallback(handler_404.into_service());
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    tracing::debug!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await?;
+    match listen {
+        Listen::Port(port) => {
+            let addr = SocketAddr::from(([0, 0, 0, 0], port));
+            tracing::debug!("listening on {}", addr);
+            axum::Server::bind(&addr)
+                .serve(app.into_make_service())
+                .await?;
+        }
+        Listen::Socket(socket) => {
+            tracing::debug!("listening on {}", socket);
+            let socket_path: PathBuf = socket.into();
+            if socket_path.exists() {
+                std::fs::remove_file(&socket_path)?;
+            }
+            let socket = axum::Server::bind_unix(&socket_path)?;
+            set_permissions(&socket_path, Permissions::from_mode(0o666))?;
+
+            socket.serve(app.into_make_service()).await?;
+        }
+    }
 
     Ok(())
 }
