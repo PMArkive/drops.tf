@@ -1,7 +1,9 @@
 {
   inputs = {
+    nixpkgs.url = "nixpkgs/release-23.05";
     flake-utils.url = "github:numtide/flake-utils";
     naersk.url = "github:nix-community/naersk";
+    naersk.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = {
@@ -14,19 +16,30 @@
       system: let
         pkgs = nixpkgs.legacyPackages."${system}";
         naersk-lib = naersk.lib."${system}";
+        lib = pkgs.lib;
       in rec {
         # `nix build`
-        packages.dropstf = naersk-lib.buildPackage {
-          pname = "dropstf";
-          root = ./.;
+        packages = rec {
+          dropstf = naersk-lib.buildPackage {
+            pname = "dropstf";
+            root = lib.sources.sourceByRegex (lib.cleanSource ./.) ["Cargo.*" "(src|benches|templates)(/.*)?" "sqlx-data.json"];
 
-          SQLX_OFFLINE = true;
+            SQLX_OFFLINE = true;
+          };
+          dockerImage = pkgs.dockerTools.buildImage {
+            name = "icewind1991/drops.tf";
+            tag = "latest";
+            copyToRoot = [dropstf];
+            config = {
+              Cmd = [ "${dropstf}/bin/dropstf"];
+            };
+          };
         };
         defaultPackage = packages.dropstf;
         defaultApp = packages.dropstf;
 
         # `nix develop`
-        devShell = pkgs.mkShell {
+        devShells.default = pkgs.mkShell {
           nativeBuildInputs = with pkgs; [rustc cargo bacon cargo-edit cargo-outdated];
         };
       }
