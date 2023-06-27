@@ -17,15 +17,22 @@
         pkgs = nixpkgs.legacyPackages."${system}";
         naersk-lib = naersk.lib."${system}";
         lib = pkgs.lib;
+        naerskConfig = {
+          pname = "dropstf";
+          root = lib.sources.sourceByRegex (lib.cleanSource ./.) ["Cargo.*" "(src|benches|templates)(/.*)?" "sqlx-data.json"];
+
+          SQLX_OFFLINE = true;
+        };
       in rec {
         # `nix build`
         packages = rec {
-          dropstf = naersk-lib.buildPackage {
-            pname = "dropstf";
-            root = lib.sources.sourceByRegex (lib.cleanSource ./.) ["Cargo.*" "(src|benches|templates)(/.*)?" "sqlx-data.json"];
-
-            SQLX_OFFLINE = true;
-          };
+          dropstf = naersk-lib.buildPackage naerskConfig;
+          check = naersk-lib.buildPackage (naerskConfig // {
+            mode = "check";
+          });
+          clippy = naersk-lib.buildPackage (naerskConfig // {
+            mode = "clippy";
+          });
           dockerImage = pkgs.dockerTools.buildImage {
             name = "icewind1991/drops.tf";
             tag = "latest";
@@ -34,13 +41,14 @@
               Cmd = [ "${dropstf}/bin/dropstf"];
             };
           };
+          default = dropstf;
         };
         defaultPackage = packages.dropstf;
         defaultApp = packages.dropstf;
 
         # `nix develop`
         devShells.default = pkgs.mkShell {
-          nativeBuildInputs = with pkgs; [rustc cargo bacon cargo-edit cargo-outdated];
+          nativeBuildInputs = with pkgs; [rustc cargo bacon cargo-edit cargo-outdated clippy];
         };
       }
     )
