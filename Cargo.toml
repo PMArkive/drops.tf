@@ -6,26 +6,26 @@ edition = "2018"
 
 [dependencies]
 sqlx = { version = "0.6.0", default_features = false, features = ["macros", "postgres", "json", "runtime-tokio-rustls", "offline"] }
-dotenv = "0.15.0"
+dotenvy = "0.15.7"
 main_error = "0.1.2"
-tokio = { version = "1.19.2", features = ["macros", "time"] }
-serde = { version = "1.0.137", features = ["derive"] }
-serde_json = "1.0.81"
-askama = "0.11.1"
+tokio = { version = "1.28.2", features = ["macros", "time"] }
+serde = { version = "1.0.164", features = ["derive"] }
+serde_json = "1.0.99"
+askama = "0.12.0"
 steamid-ng = "1.0.0"
 steam-resolve-vanity = { version = "0.4.0", default-features = false, features = ["rustls-tls"] }
-tracing = "0.1.35"
+tracing = "0.1.37"
 tracing-opentelemetry = "0.19.0"
 opentelemetry = { version = "0.19.0", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.12.0" }
-tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
-moka = { version = "0.8.6", features = ["future"] }
-axum = "0.5.9"
-tower-http = { version = "0.3.4", features = ["trace"] }
-thiserror = "1.0.31"
-metrics-exporter-prometheus = "0.10.0"
-metrics = "0.19.0"
-smol_str = "0.1.23"
+tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+moka = { version = "0.11.2", features = ["future"] }
+axum = "0.6.18"
+tower-http = { version = "0.4.1", features = ["trace"] }
+thiserror = "1.0.40"
+metrics-exporter-prometheus = "0.12.1"
+metrics = "0.21.0"
+smol_str = { version = "0.2.0", features = ["serde"] }
 hyperlocal = "0.8.0"
 
 [profile.release]

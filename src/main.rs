@@ -1,5 +1,4 @@
 use axum::extract::MatchedPath;
-use axum::handler::Handler;
 use axum::http::Request;
 use axum::middleware::Next;
 use axum::response::IntoResponse;
@@ -32,7 +31,7 @@ enum Listen {
 
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
-    if let Ok(tracing_endpoint) = dotenv::var("TRACING_ENDPOINT") {
+    if let Ok(tracing_endpoint) = dotenvy::var("TRACING_ENDPOINT") {
         let otlp_exporter = opentelemetry_otlp::new_exporter()
             .tonic()
             .with_endpoint(tracing_endpoint);
@@ -59,11 +58,11 @@ async fn main() -> Result<(), MainError> {
             .try_init()?;
     }
 
-    let database_url = dotenv::var("DATABASE_URL")?;
-    let api_key = dotenv::var("STEAM_API_KEY")?;
-    let listen = match dotenv::var("SOCKET") {
+    let database_url = dotenvy::var("DATABASE_URL")?;
+    let api_key = dotenvy::var("STEAM_API_KEY")?;
+    let listen = match dotenvy::var("SOCKET") {
         Ok(socket) => Listen::Socket(socket),
-        _ => Listen::Port(u16::from_str(&dotenv::var("PORT")?)?),
+        _ => Listen::Port(u16::from_str(&dotenvy::var("PORT")?)?),
     };
 
     let pool = PgPool::connect(&database_url).await?;
@@ -94,7 +93,7 @@ async fn main() -> Result<(), MainError> {
         .route_layer(middleware::from_fn(track_metrics))
         .layer(Extension(data_source))
         .layer(TraceLayer::new_for_http())
-        .fallback(handler_404.into_service());
+        .fallback(handler_404);
 
     match listen {
         Listen::Port(port) => {
