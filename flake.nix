@@ -27,24 +27,24 @@
         # `nix build`
         packages = rec {
           dropstf = naersk-lib.buildPackage naerskConfig;
-          check = naersk-lib.buildPackage (naerskConfig // {
-            mode = "check";
-          });
-          clippy = naersk-lib.buildPackage (naerskConfig // {
-            mode = "clippy";
-          });
+          check = naersk-lib.buildPackage (naerskConfig
+            // {
+              mode = "check";
+            });
+          clippy = naersk-lib.buildPackage (naerskConfig
+            // {
+              mode = "clippy";
+            });
           dockerImage = pkgs.dockerTools.buildImage {
             name = "icewind1991/drops.tf";
             tag = "latest";
             copyToRoot = [dropstf];
             config = {
-              Cmd = [ "${dropstf}/bin/dropstf"];
+              Cmd = ["${dropstf}/bin/dropstf"];
             };
           };
           default = dropstf;
         };
-        defaultPackage = packages.dropstf;
-        defaultApp = packages.dropstf;
 
         # `nix develop`
         devShells.default = pkgs.mkShell {
@@ -53,7 +53,7 @@
       }
     )
     // {
-      nixosModule = {
+      nixosModules.default = {
         config,
         lib,
         pkgs,
@@ -91,19 +91,34 @@
               default = false;
               description = "listen to a unix socket instead of TCP";
             };
+
+            tracingEndpoint = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+              description = "OTLP tracing endpoint";
+            };
           };
 
           config = mkIf cfg.enable {
             systemd.services."dropstf" = let
-              pkg = self.defaultPackage.${pkgs.system};
+              pkg = self.packages.${pkgs.system}.default;
+              needIp = (cfg.enableUnixSocket == false) || (cfg.tracingEndpoint != null);
             in {
               wantedBy = ["multi-user.target"];
               script = "${pkg}/bin/dropstf";
-              environment = if cfg.enableUnixSocket then {
-                SOCKET = "/run/dropstf/drops.sock";
-              } else {
-                PORT = toString cfg.port;
-              };
+              environment =
+                (
+                  if cfg.enableUnixSocket
+                  then {
+                    SOCKET = "/run/dropstf/drops.sock";
+                  }
+                  else {
+                    PORT = toString cfg.port;
+                  }
+                )
+                // (attrsets.optionalAttrs (cfg.tracingEndpoint != null) {
+                  TRACING_ENDPOINT = cfg.tracingEndpoint;
+                });
 
               serviceConfig = {
                 EnvironmentFile = [cfg.databaseUrlFile cfg.streamApiKeyFile];
@@ -125,9 +140,12 @@
                 ProtectHostname = true;
                 LockPersonality = true;
                 ProtectKernelTunables = true;
-                RestrictAddressFamilies = if cfg.enableUnixSocket then "AF_UNIX" else "AF_INET AF_INET6 AF_UNIX";
-                IPAddressDeny = if cfg.enableUnixSocket then "any" else "multicast";
-                PrivateNetwork = cfg.enableUnixSocket;
+                RestrictAddressFamilies = ["AF_UNIX"] ++ (optionals needIp ["AF_INET" "AF_INET6"]);
+                IPAddressDeny =
+                  if needIp == false
+                  then "any"
+                  else "multicast";
+                PrivateNetwork = needIp == false;
                 RestrictRealtime = true;
                 ProtectProc = "invisible";
                 SystemCallFilter = ["@system-service" "~@resources" "~@privileged"];
