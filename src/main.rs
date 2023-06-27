@@ -9,6 +9,9 @@ use dropstf::{api_search, handler_404, page_player, page_top_stats, DataSource, 
 use hyperlocal::UnixServerExt;
 use main_error::MainError;
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder, PrometheusHandle};
+use opentelemetry::sdk::{trace, Resource};
+use opentelemetry::KeyValue;
+use opentelemetry_otlp::WithExportConfig;
 use sqlx::postgres::PgPool;
 use std::fs::{set_permissions, Permissions};
 use std::future::ready;
@@ -30,10 +33,17 @@ enum Listen {
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
     if let Ok(tracing_endpoint) = dotenv::var("TRACING_ENDPOINT") {
-        let tracer = opentelemetry_jaeger::new_pipeline()
-            .with_agent_endpoint(tracing_endpoint)
-            .with_service_name("drops.tf")
-            .install_simple()?;
+        let otlp_exporter = opentelemetry_otlp::new_exporter()
+            .tonic()
+            .with_endpoint(tracing_endpoint);
+        let tracer =
+            opentelemetry_otlp::new_pipeline()
+                .tracing()
+                .with_exporter(otlp_exporter)
+                .with_trace_config(trace::config().with_resource(Resource::new(vec![
+                    KeyValue::new("service.name", "drops.tf"),
+                ])))
+                .install_batch(opentelemetry::runtime::Tokio)?;
         let open_telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
         tracing_subscriber::registry()
             .with(tracing_subscriber::EnvFilter::new(
