@@ -5,6 +5,7 @@ use axum::extract::{Path, Query};
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Response};
 use axum::{Extension, Json};
+use metrics::counter;
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -111,13 +112,14 @@ pub async fn page_player(
         DropsError::UserNotFound
     })?;
 
-    metrics::increment_counter!(
+    let counter = counter!(
         "player_stats",
         &[
             ("steam_id", format!("{}", u64::from(steam_id))),
             ("name", stats.name.to_string())
         ]
     );
+    counter.increment(1);
 
     let template = PlayerTemplate { stats };
     Ok(Html(template.render()?))

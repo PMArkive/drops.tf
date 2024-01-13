@@ -7,10 +7,11 @@ use axum::{middleware, Extension, Router};
 use dropstf::{api_search, handler_404, page_player, page_top_stats, DataSource, TopOrder};
 use hyperlocal::UnixServerExt;
 use main_error::MainError;
+use metrics::{counter, histogram};
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder, PrometheusHandle};
-use opentelemetry::sdk::{trace, Resource};
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::{runtime, trace, Resource};
 use sqlx::postgres::PgPool;
 use std::fs::{set_permissions, Permissions};
 use std::future::ready;
@@ -42,7 +43,7 @@ async fn main() -> Result<(), MainError> {
                 .with_trace_config(trace::config().with_resource(Resource::new(vec![
                     KeyValue::new("service.name", "drops.tf"),
                 ])))
-                .install_batch(opentelemetry::runtime::Tokio)?;
+                .install_batch(runtime::Tokio)?;
         let open_telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
         tracing_subscriber::registry()
             .with(tracing_subscriber::EnvFilter::new(
@@ -98,13 +99,13 @@ async fn main() -> Result<(), MainError> {
     match listen {
         Listen::Port(port) => {
             let addr = SocketAddr::from(([0, 0, 0, 0], port));
-            tracing::debug!("listening on {}", addr);
+            tracing::info!("listening on {}", addr);
             axum::Server::bind(&addr)
                 .serve(app.into_make_service())
                 .await?;
         }
         Listen::Socket(socket) => {
-            tracing::debug!("listening on {}", socket);
+            tracing::info!("listening on {}", socket);
             let socket_path: PathBuf = socket.into();
             if socket_path.exists() {
                 std::fs::remove_file(&socket_path)?;
@@ -155,8 +156,8 @@ async fn track_metrics<B>(req: Request<B>, next: Next<B>) -> impl IntoResponse {
             ("status", status),
         ];
 
-        metrics::increment_counter!("http_requests_total", &labels);
-        metrics::histogram!("http_requests_duration_seconds", latency, &labels);
+        counter!("http_requests_total", &labels).increment(1);
+        histogram!("http_requests_duration_seconds", &labels).record(latency);
     }
 
     response
