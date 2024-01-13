@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO vanity_urls(url, steam_id) VALUES($1, $2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f526d9d4ad2f8a38f8fb3b3cfb5bff962d915ccd7f88e8ac4a8af37a833c8926"
+}

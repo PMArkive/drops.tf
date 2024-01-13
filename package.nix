@@ -4,7 +4,7 @@
   lib,
 }: let
   inherit (lib.sources) sourceByRegex;
-  src = sourceByRegex ./. ["Cargo.*" "(src|templates|benches)(/.*)?" "sqlx-data.json"];
+  src = sourceByRegex ./. ["Cargo.*" "(src|templates|benches|.sqlx)(/.*)?"];
 in
   rustPlatform.buildRustPackage rec {
     pname = "dropstf";

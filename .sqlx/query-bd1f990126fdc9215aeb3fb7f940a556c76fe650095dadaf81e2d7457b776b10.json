@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT drops as \"drops!\", ubers as \"ubers!\", games as \"games!\" FROM global_stats",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "drops!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "ubers!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "games!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "bd1f990126fdc9215aeb3fb7f940a556c76fe650095dadaf81e2d7457b776b10"
+}

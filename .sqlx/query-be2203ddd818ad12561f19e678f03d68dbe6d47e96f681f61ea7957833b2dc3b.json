@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT steam_id as \"steam_id!: _\", name as \"name!: _\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\",\n                medic_time as \"medic_time!\", drops_rank as \"drops_rank!\", dpu_rank as \"dpu_rank!\", dps_rank as \"dps_rank!\", dpg_rank as \"dpg_rank!\"\n                FROM ranked_medic_stats\n                WHERE steam_id=$1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "steam_id!: _",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "name!: _",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "games!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "ubers!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "drops!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "medic_time!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "drops_rank!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "dpu_rank!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "dps_rank!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "dpg_rank!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "be2203ddd818ad12561f19e678f03d68dbe6d47e96f681f61ea7957833b2dc3b"
+}

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT steam_id as \"steam_id!: SteamId\" FROM vanity_urls WHERE url=$1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "steam_id!: SteamId",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7ad21df124f5a72093867c019bb3b2072c19bdb4d76031770d786d1cf7b4e7e1"
+}

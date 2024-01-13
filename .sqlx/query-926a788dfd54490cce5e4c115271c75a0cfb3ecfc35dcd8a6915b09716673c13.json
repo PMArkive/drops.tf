@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT steam_id as \"steam_id!: _\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\", name as \"name!\"\n                        FROM ranked_medic_stats\n                        ORDER BY dps DESC LIMIT 25",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "steam_id!: _",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "games!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "ubers!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "drops!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "medic_time!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "name!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "926a788dfd54490cce5e4c115271c75a0cfb3ecfc35dcd8a6915b09716673c13"
+}

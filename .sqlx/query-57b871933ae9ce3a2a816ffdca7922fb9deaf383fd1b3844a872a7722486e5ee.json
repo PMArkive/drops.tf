@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT steam_id as \"steam_id!: _\", name as \"name!\", count as \"count!\", (1 - (name  <-> $1)) AS \"sim!\" \n            FROM medic_names\n            WHERE name ~* $1\n            ORDER BY count DESC\n            LIMIT 50",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "steam_id!: _",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "sim!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "57b871933ae9ce3a2a816ffdca7922fb9deaf383fd1b3844a872a7722486e5ee"
+}

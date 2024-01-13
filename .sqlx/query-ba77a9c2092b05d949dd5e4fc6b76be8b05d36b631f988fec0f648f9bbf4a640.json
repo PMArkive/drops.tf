@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT user_names.steam_id as \"steam_id!: _\", name as \"name!: _\", games as \"games!\", ubers as \"ubers!\", drops as \"drops!\", medic_time as \"medic_time!\",\n                    (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.drops > medic_stats.drops AND m2.drops > 100) + 1 AS \"drops_rank!\",\n                    (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpu > medic_stats.dpu AND m2.drops > 100) + 1 AS \"dpu_rank!\",\n                    (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dps > medic_stats.dps AND m2.drops > 100) + 1 AS \"dps_rank!\",\n                    (SELECT COUNT(*) FROM ranked_medic_stats m2 WHERE m2.dpg > medic_stats.dpg AND m2.drops > 100) + 1 AS \"dpg_rank!\"\n                    FROM medic_stats\n                    INNER JOIN user_names ON user_names.steam_id = medic_stats.steam_id\n                    WHERE medic_stats.steam_id=$1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "steam_id!: _",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "name!: _",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "games!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "ubers!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "drops!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "medic_time!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "drops_rank!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "dpu_rank!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "dps_rank!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "dpg_rank!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "ba77a9c2092b05d949dd5e4fc6b76be8b05d36b631f988fec0f648f9bbf4a640"
+}
