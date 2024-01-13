@@ -4,7 +4,9 @@ use axum::middleware::Next;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{middleware, Extension, Router};
-use dropstf::{api_search, handler_404, page_player, page_top_stats, DataSource, TopOrder};
+use dropstf::{
+    api_search, get_log, handler_404, last_log, page_player, page_top_stats, DataSource, TopOrder,
+};
 use hyperlocal::UnixServerExt;
 use main_error::MainError;
 use metrics::{counter, histogram};
@@ -91,6 +93,8 @@ async fn main() -> Result<(), MainError> {
         .route("/profile/:steam_id", get(page_player))
         .route("/search", get(api_search))
         .route("/metrics", get(move || ready(recorder_handle.render())))
+        .route("/api/log/last", get(last_log))
+        .route("/api/log/:id", get(get_log))
         .route_layer(middleware::from_fn(track_metrics))
         .layer(Extension(data_source))
         .layer(TraceLayer::new_for_http())

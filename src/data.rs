@@ -3,6 +3,7 @@ use crate::str::SmolStr;
 use crate::DropsError;
 use moka::future::Cache;
 use serde::{Deserialize, Serialize};
+use sqlx::types::JsonValue;
 use sqlx::PgPool;
 use std::collections::HashSet;
 use std::fmt;
@@ -228,6 +229,33 @@ impl DataSource {
             Ok(None)
         }
     }
+
+    #[instrument(skip(self))]
+    pub async fn raw_log(&self, id: u64) -> Result<JsonValue, DropsError> {
+        let result = sqlx::query_as!(
+            RawLog,
+            r#"SELECT json FROM logs_raw WHERE id = $1"#,
+            id as i32
+        )
+        .fetch_optional(&self.database)
+        .await?
+        .ok_or(DropsError::NotFound)?;
+
+        Ok(result.json)
+    }
+
+    #[instrument(skip(self))]
+    pub async fn last_log(&self) -> Result<u64, DropsError> {
+        let result = sqlx::query_as!(
+            RawLogId,
+            r#"SELECT id FROM logs_raw ORDER BY id DESC LIMIT 1"#
+        )
+        .fetch_optional(&self.database)
+        .await?
+        .ok_or(DropsError::NotFound)?;
+
+        Ok(result.id as u64)
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -314,6 +342,16 @@ pub struct GlobalStats {
     pub drops: i64,
     pub ubers: i64,
     pub games: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct RawLog {
+    pub json: JsonValue,
+}
+
+#[derive(Debug, Clone)]
+pub struct RawLogId {
+    pub id: i32,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone, Copy)]

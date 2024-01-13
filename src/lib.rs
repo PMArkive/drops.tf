@@ -3,7 +3,7 @@ pub use crate::str::SmolStr;
 use askama::Template;
 use axum::extract::{Path, Query};
 use axum::http::StatusCode;
-use axum::response::{Html, IntoResponse, Response};
+use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::{Extension, Json};
 use metrics::counter;
 use std::borrow::Cow;
@@ -132,6 +132,23 @@ pub async fn api_search(
 ) -> Result<impl IntoResponse, DropsError> {
     let result = data_source.player_search(&query.search).await?;
     Ok(Json(result))
+}
+
+#[instrument(skip(data_source))]
+pub async fn get_log(
+    Extension(data_source): Extension<DataSource>,
+    Path(id): Path<u64>,
+) -> Result<impl IntoResponse, DropsError> {
+    let result = data_source.raw_log(id).await?;
+    Ok(Json(result))
+}
+
+#[instrument(skip(data_source))]
+pub async fn last_log(
+    Extension(data_source): Extension<DataSource>,
+) -> Result<impl IntoResponse, DropsError> {
+    let result = data_source.last_log().await?;
+    Ok(Redirect::temporary(&format!("/api/log/{result}")))
 }
 
 pub async fn handler_404() -> impl IntoResponse {
