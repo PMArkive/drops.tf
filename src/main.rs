@@ -12,7 +12,7 @@ use main_error::MainError;
 use metrics::{counter, histogram};
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder, PrometheusHandle};
 use opentelemetry::KeyValue;
-use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_otlp::{TonicExporterBuilder, WithExportConfig};
 use opentelemetry_sdk::{runtime, trace, Resource};
 use sqlx::postgres::PgPool;
 use std::fs::{set_permissions, Permissions};
@@ -44,8 +44,9 @@ enum Listen {
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
     if let Ok(tracing_endpoint) = dotenvy::var("TRACING_ENDPOINT") {
-        let otlp_exporter = opentelemetry_otlp::new_exporter()
-            .tonic()
+        let tls_config = tonic::transport::ClientTlsConfig::new().with_native_roots();
+        let otlp_exporter = TonicExporterBuilder::default()
+            .with_tls_config(tls_config)
             .with_endpoint(tracing_endpoint);
         let tracer =
             opentelemetry_otlp::new_pipeline()
