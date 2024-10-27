@@ -1,4 +1,5 @@
-use axum::extract::MatchedPath;
+use std::convert::Infallible;
+use axum::extract::{connect_info, MatchedPath};
 use axum::http::Request;
 use axum::middleware::Next;
 use axum::response::IntoResponse;
@@ -7,7 +8,6 @@ use axum::{middleware, Extension, Router};
 use dropstf::{
     api_search, get_log, handler_404, last_log, page_player, page_top_stats, DataSource, TopOrder,
 };
-use hyperlocal::UnixServerExt;
 use main_error::MainError;
 use metrics::{counter, histogram};
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder, PrometheusHandle};
@@ -21,8 +21,17 @@ use std::net::SocketAddr;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::Arc;
+use axum::body::Body;
+use hyper::body::Incoming;
+use hyper_util::rt::{TokioExecutor, TokioIo};
+use hyper_util::server;
+use opentelemetry::trace::TracerProvider;
+use tokio::net::unix::UCred;
+use tokio::net::{UnixListener, UnixStream};
 use tokio::time::Instant;
 use tower_http::trace::TraceLayer;
+use tower_service::Service;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
@@ -42,10 +51,11 @@ async fn main() -> Result<(), MainError> {
             opentelemetry_otlp::new_pipeline()
                 .tracing()
                 .with_exporter(otlp_exporter)
-                .with_trace_config(trace::config().with_resource(Resource::new(vec![
+                .with_trace_config(trace::Config::default().with_resource(Resource::new(vec![
                     KeyValue::new("service.name", "drops.tf"),
                 ])))
-                .install_batch(runtime::Tokio)?;
+                .install_batch(runtime::Tokio)?
+                .tracer("drops.tf");
         let open_telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
         tracing_subscriber::registry()
             .with(tracing_subscriber::EnvFilter::new(
@@ -104,9 +114,9 @@ async fn main() -> Result<(), MainError> {
         Listen::Port(port) => {
             let addr = SocketAddr::from(([0, 0, 0, 0], port));
             tracing::info!("listening on {}", addr);
-            axum::Server::bind(&addr)
-                .serve(app.into_make_service())
+            let listener = tokio::net::TcpListener::bind(addr)
                 .await?;
+            axum::serve(listener, app).await?;
         }
         Listen::Socket(socket) => {
             tracing::info!("listening on {}", socket);
@@ -114,14 +124,68 @@ async fn main() -> Result<(), MainError> {
             if socket_path.exists() {
                 std::fs::remove_file(&socket_path)?;
             }
-            let socket = axum::Server::bind_unix(&socket_path)?;
+            let listener = UnixListener::bind(&socket_path)?;
             set_permissions(&socket_path, Permissions::from_mode(0o666))?;
 
-            socket.serve(app.into_make_service()).await?;
+
+            tokio::spawn(async move {
+                let mut make_service = app.into_make_service_with_connect_info::<UdsConnectInfo>();
+
+                // See https://github.com/tokio-rs/axum/blob/main/examples/serve-with-hyper/src/main.rs for
+                // more details about this setup
+                loop {
+                    let (socket, _remote_addr) = listener.accept().await.unwrap();
+
+                    let tower_service = unwrap_infallible(make_service.call(&socket).await);
+
+                    tokio::spawn(async move {
+                        let socket = TokioIo::new(socket);
+
+                        let hyper_service =
+                            hyper::service::service_fn(move |request: Request<Incoming>| {
+                                tower_service.clone().call(request)
+                            });
+
+                        if let Err(err) = server::conn::auto::Builder::new(TokioExecutor::new())
+                            .serve_connection_with_upgrades(socket, hyper_service)
+                            .await
+                        {
+                            eprintln!("failed to serve connection: {err:#}");
+                        }
+                    });
+                }
+            });
         }
     }
 
     Ok(())
+}
+
+
+#[derive(Clone, Debug)]
+#[allow(dead_code)]
+struct UdsConnectInfo {
+    peer_addr: Arc<tokio::net::unix::SocketAddr>,
+    peer_cred: UCred,
+}
+
+impl connect_info::Connected<&UnixStream> for UdsConnectInfo {
+    fn connect_info(target: &UnixStream) -> Self {
+        let peer_addr = target.peer_addr().unwrap();
+        let peer_cred = target.peer_cred().unwrap();
+
+        Self {
+            peer_addr: Arc::new(peer_addr),
+            peer_cred,
+        }
+    }
+}
+
+fn unwrap_infallible<T>(result: Result<T, Infallible>) -> T {
+    match result {
+        Ok(value) => value,
+        Err(err) => match err {},
+    }
 }
 
 fn setup_metrics_recorder() -> PrometheusHandle {
@@ -139,7 +203,7 @@ fn setup_metrics_recorder() -> PrometheusHandle {
         .unwrap()
 }
 
-async fn track_metrics<B>(req: Request<B>, next: Next<B>) -> impl IntoResponse {
+async fn track_metrics(req: Request<Body>, next: Next) -> impl IntoResponse {
     let start = Instant::now();
     let path = if let Some(matched_path) = req.extensions().get::<MatchedPath>() {
         matched_path.as_str().to_owned()

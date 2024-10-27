@@ -1,5 +1,4 @@
 use serde::{Serialize, Serializer};
-use sqlx::database::HasValueRef;
 use sqlx::error::BoxDynError;
 use sqlx::{Database, Decode, Type};
 use std::convert::TryFrom;
@@ -91,7 +90,7 @@ where
     DB: Database,
     &'r str: Decode<'r, DB>,
 {
-    fn decode(value: <DB as HasValueRef<'r>>::ValueRef) -> Result<Self, BoxDynError> {
+    fn decode(value: DB::ValueRef<'r>) -> Result<Self, BoxDynError> {
         let str = <&str as Decode<DB>>::decode(value)?;
         Ok(Self::from_steam3(str)?)
     }
