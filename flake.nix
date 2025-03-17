@@ -36,7 +36,7 @@
           lib,
           ...
         }: {
-          imports = [./module.nix];
+          imports = [./nix/module.nix];
           config = lib.mkIf config.services.dropstf.enable {
             nixpkgs.overlays = [outputs.overlays.default];
             services.dropstf.package = lib.mkDefault pkgs.dropstf;
