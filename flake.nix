@@ -10,10 +10,7 @@
       inputs.flakelight.follows = "flakelight";
     };
   };
-  outputs = {
-    mill-scale,
-    ...
-  }:
+  outputs = {mill-scale, ...}:
     mill-scale ./. {
       extraPaths = [
         ./.sqlx
@@ -32,5 +29,19 @@
           typescript
           sqlx-cli
         ];
+      nixosModules = {outputs, ...}: {
+        default = {
+          pkgs,
+          config,
+          lib,
+          ...
+        }: {
+          imports = [./module.nix];
+          config = lib.mkIf config.services.dropstf.enable {
+            nixpkgs.overlays = [outputs.overlays.default];
+            services.dropstf.package = lib.mkDefault pkgs.dropstf;
+          };
+        };
+      };
     };
 }

@@ -102,9 +102,8 @@ pub async fn page_player(
             .resolve_vanity_url(&steam_id)
             .await?
             .ok_or(e)
-            .map_err(|e| {
+            .inspect_err(|_| {
                 error!(steam_id = display(steam_id), "user not found");
-                e
             })?,
     };
     let stats = data_source.stats_for_user(steam_id).await.map_err(|_| {

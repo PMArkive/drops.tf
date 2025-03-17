@@ -17,7 +17,7 @@ in {
 
     databaseUrlFile = mkOption {
       type = types.str;
-      description = "file containg DATABASE_URL variable";
+      description = "file containing DATABASE_URL variable";
     };
 
     streamApiKeyFile = mkOption {
