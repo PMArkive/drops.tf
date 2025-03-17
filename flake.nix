@@ -20,15 +20,6 @@
       withOverlays = [
         (import ./nix/overlay.nix)
       ];
-      tools = pkgs:
-        with pkgs; [
-          bacon
-          cargo-edit
-          nodejs
-          nodePackages.svgo
-          typescript
-          sqlx-cli
-        ];
       nixosModules = {outputs, ...}: {
         default = {
           pkgs,
