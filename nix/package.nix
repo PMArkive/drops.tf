@@ -4,7 +4,7 @@
   lib,
 }: let
   inherit (lib.sources) sourceByRegex;
-  src = sourceByRegex ./. ["Cargo.*" "(src|templates|benches|.sqlx)(/.*)?"];
+  src = sourceByRegex ../. ["Cargo.*" "(src|templates|benches|.sqlx)(/.*)?"];
 in
   rustPlatform.buildRustPackage rec {
     pname = "dropstf";
@@ -13,7 +13,7 @@ in
     inherit src;
 
     cargoLock = {
-      lockFile = ./Cargo.lock;
+      lockFile = ../Cargo.lock;
     };
 
     SQLX_OFFLINE = true;
