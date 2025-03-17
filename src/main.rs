@@ -1,4 +1,4 @@
-use std::convert::Infallible;
+use axum::body::Body;
 use axum::extract::{connect_info, MatchedPath};
 use axum::http::Request;
 use axum::middleware::Next;
@@ -8,13 +8,19 @@ use axum::{middleware, Extension, Router};
 use dropstf::{
     api_search, get_log, handler_404, last_log, page_player, page_top_stats, DataSource, TopOrder,
 };
+use hyper::body::Incoming;
+use hyper_util::rt::{TokioExecutor, TokioIo};
+use hyper_util::server;
 use main_error::MainError;
 use metrics::{counter, histogram};
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder, PrometheusHandle};
+use opentelemetry::trace::TracerProvider;
 use opentelemetry::KeyValue;
-use opentelemetry_otlp::{TonicExporterBuilder, WithExportConfig};
-use opentelemetry_sdk::{runtime, trace, Resource};
+use opentelemetry_otlp::{SpanExporter, WithExportConfig, WithTonicConfig};
+use opentelemetry_sdk::trace::SdkTracerProvider;
+use opentelemetry_sdk::Resource;
 use sqlx::postgres::PgPool;
+use std::convert::Infallible;
 use std::fs::{set_permissions, Permissions};
 use std::future::ready;
 use std::net::SocketAddr;
@@ -22,11 +28,6 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use axum::body::Body;
-use hyper::body::Incoming;
-use hyper_util::rt::{TokioExecutor, TokioIo};
-use hyper_util::server;
-use opentelemetry::trace::TracerProvider;
 use tokio::net::unix::UCred;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::time::Instant;
@@ -45,18 +46,19 @@ enum Listen {
 async fn main() -> Result<(), MainError> {
     if let Ok(tracing_endpoint) = dotenvy::var("TRACING_ENDPOINT") {
         let tls_config = tonic::transport::ClientTlsConfig::new().with_native_roots();
-        let otlp_exporter = TonicExporterBuilder::default()
-            .with_tls_config(tls_config)
-            .with_endpoint(tracing_endpoint);
-        let tracer =
-            opentelemetry_otlp::new_pipeline()
-                .tracing()
-                .with_exporter(otlp_exporter)
-                .with_trace_config(trace::Config::default().with_resource(Resource::new(vec![
-                    KeyValue::new("service.name", "drops.tf"),
-                ])))
-                .install_batch(runtime::Tokio)?
-                .tracer("drops.tf");
+        let otlp_exporter = SpanExporter::builder()
+            .with_tonic()
+            .with_endpoint(tracing_endpoint)
+            .with_tls_config(tls_config);
+        let tracer = SdkTracerProvider::builder()
+            .with_resource(
+                Resource::builder()
+                    .with_attribute(KeyValue::new("service.name", "drops.tf"))
+                    .build(),
+            )
+            .with_batch_exporter(otlp_exporter.build()?)
+            .build()
+            .tracer("drops.tf");
         let open_telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
         tracing_subscriber::registry()
             .with(tracing_subscriber::EnvFilter::new(
@@ -101,11 +103,11 @@ async fn main() -> Result<(), MainError> {
             "/dpu",
             get(|data_source| page_top_stats(data_source, TopOrder::Dpu)),
         )
-        .route("/profile/:steam_id", get(page_player))
+        .route("/profile/{steam_id}", get(page_player))
         .route("/search", get(api_search))
         .route("/metrics", get(move || ready(recorder_handle.render())))
         .route("/api/log/last", get(last_log))
-        .route("/api/log/:id", get(get_log))
+        .route("/api/log/{id}", get(get_log))
         .route_layer(middleware::from_fn(track_metrics))
         .layer(Extension(data_source))
         .layer(TraceLayer::new_for_http())
@@ -115,8 +117,7 @@ async fn main() -> Result<(), MainError> {
         Listen::Port(port) => {
             let addr = SocketAddr::from(([0, 0, 0, 0], port));
             tracing::info!("listening on {}", addr);
-            let listener = tokio::net::TcpListener::bind(addr)
-                .await?;
+            let listener = tokio::net::TcpListener::bind(addr).await?;
             axum::serve(listener, app).await?;
         }
         Listen::Socket(socket) => {
@@ -158,7 +159,6 @@ async fn main() -> Result<(), MainError> {
 
     Ok(())
 }
-
 
 #[derive(Clone, Debug)]
 #[allow(dead_code)]

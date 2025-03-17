@@ -5,30 +5,29 @@ authors = ["Robin Appelman <robin@icewind.nl>"]
 edition = "2018"
 
 [dependencies]
-sqlx = { version = "0.8.2", default-features = false, features = ["macros", "postgres", "json", "runtime-tokio-rustls"] }
+sqlx = { version = "0.8.3", default-features = false, features = ["macros", "postgres", "json", "runtime-tokio-rustls"] }
 dotenvy = "0.15.7"
 main_error = "0.1.2"
-tokio = { version = "1.41.0", features = ["macros", "time", "rt-multi-thread"] }
-serde = { version = "1.0.213", features = ["derive"] }
-serde_json = "1.0.132"
+tokio = { version = "1.44.1", features = ["macros", "time", "rt-multi-thread"] }
+serde = { version = "1.0.219", features = ["derive"] }
 askama = "0.12.1"
 steamid-ng = "1.0.0"
 steam-resolve-vanity = { version = "0.4.0", default-features = false, features = ["rustls-tls"] }
-tracing = "0.1.40"
-tracing-opentelemetry = "0.27.0"
-opentelemetry = { version = "0.26.0" }
-opentelemetry_sdk = { version = "0.26.0", features = ["rt-tokio"] }
-opentelemetry-otlp = { version = "0.26.0", features = ["tls", "tls-webpki-roots"] }
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-moka = { version = "0.12.8", features = ["future"] }
-axum = { version = "0.7.7", features = ["macros"] }
-tower-http = { version = "0.6.1", features = ["trace"] }
-thiserror = "1.0.65"
-metrics-exporter-prometheus = { version = "0.16.0", default-features = false }
-metrics = "0.24.0"
+tracing = "0.1.41"
+tracing-opentelemetry = "0.29.0"
+opentelemetry = { version = "0.28.0" }
+opentelemetry_sdk = { version = "0.28.0", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.28.0", features = ["tls", "tls-webpki-roots", "grpc-tonic"] }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+moka = { version = "0.12.10", features = ["future"] }
+axum = { version = "0.8.1", features = ["macros"] }
+tower-http = { version = "0.6.2", features = ["trace"] }
+thiserror = "2.0.12"
+metrics-exporter-prometheus = { version = "0.16.2", default-features = false }
+metrics = "0.24.1"
 smol_str = { version = "0.3.2", features = ["serde"] }
-hyper = "1.5.0"
-hyper-util = { version = "0.1.9", features = ["tokio", "server-auto", "http1"] }
+hyper = "1.6.0"
+hyper-util = { version = "0.1.10", features = ["tokio", "server-auto", "http1"] }
 tower-service = "0.3.3"
 tonic = { version = "0.12.3", features = ["tls-native-roots"] }
 
